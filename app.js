@@ -1,5 +1,5 @@
 /**
- * GIDEON-Stream-Client // Сетевой координатор через Telegram API
+ * GIDEON-Stream-Client // Сетевой координатор P2P-видеосвязи (Тестовый режим)
  */
 
 // Селекторы интерфейса
@@ -17,36 +17,18 @@ const peerIdInput = document.getElementById('peerIdInput');
 const btnConnect = document.getElementById('btnConnect');
 const netStatus = document.getElementById('netStatus');
 
-// Константы и токен Telegram Вашего бота
-const TG_TOKEN = "8632880535:AAHl_PdkJ1r5hYrR9PwzG5akGBVpUbY2my8";
-const DENSITY = 350; 
+const DENSITY = 400; // Количество вокселей в полувитке Сфирали
 let sTime = 0;
 
-let myChatId = "LOCAL_USER";
-let targetChatId = null;
-let lastReceivedData = null;
-let lastUpdateId = 0;
-
-// Инициализация Telegram WebApp контекста
-if (window.Telegram && window.Telegram.WebApp) {
-    const tg = window.Telegram.WebApp;
-    tg.ready();
-    tg.expand(); // Разворачиваем на весь экран смартфона
-    
-    if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-        myChatId = tg.initDataUnsafe.user.id.toString();
-    }
-}
-
-// Выводим ID на экран
-myIdDisplay.innerText = myChatId;
-netStatus.innerText = "СТАТУС: ИНТЕГРАЦИЯ TG АКТИВНА. ОЖИДАНИЕ СЕССИИ";
+// Устанавливаем понятные статусы для новичка
+myIdDisplay.innerText = "GIDEON_LOCAL_NODE";
+netStatus.innerText = "СТАТУС: РЕЖИМ САМОДИАГНОСТИКИ (АВТОНОМНО)";
 netStatus.style.color = "#00ffcc";
 
-// Запуск камеры сенсора
+// Автоматически запускаем сенсор камеры
 startCameraCapture();
 
-// Подгонка окон
+// Подгонка размеров окон вывода
 function resizeViewports() {
     localCanvas.width = localCanvas.clientWidth;
     localCanvas.height = localCanvas.clientHeight;
@@ -56,97 +38,24 @@ function resizeViewports() {
 window.addEventListener('resize', resizeViewports);
 resizeViewports();
 
-// Логика кнопки подключения
-btnConnect.addEventListener('click', () => {
-    const inputVal = peerIdInput.value.trim();
-    if (!inputVal) {
-        alert("Пожалуйста, введите Chat ID абонента");
-        return;
-    }
-    targetChatId = inputVal;
-    netStatus.innerText = `СТАТУС: ТРАНСЛЯЦИЯ НА УЗЕЛ [${targetChatId}]`;
-    netStatus.style.color = "#bd00ff";
-    
-    // Запускаем бесконечный цикл прослушивания входящих сигналов от бота
-    setInterval(fetchTelegramUpdates, 1000);
-});
-
-// --- СЕТЕВОЙ ОБМЕН ЧЕРЕЗ TELEGRAM API ---
-
-// Функция отправки 50% сжатых вокселей Сфирали абоненту
-async function sendSfiralDataViaTG(voxelsPack) {
-    if (!targetChatId) return;
-    
-    // Сжимаем пакет в ультра-компактную строку для экономии трафика мессенджера
-    const payload = {
-        type: "gideon_v-",
-        from: myChatId,
-        v: voxelsPack.map(pt => [Math.round(pt.x*100), Math.round(pt.y*100), Math.round(pt.z*100), pt.r, pt.g, pt.b])
-    };
-
-    try {
-        await fetch(`https://telegram.org{TG_TOKEN}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: targetChatId,
-                text: `GIDEON_STREAM:${JSON.stringify(payload)}`,
-                disable_notification: true
-            })
-        });
-    } catch (e) {
-        // Игнорируем сетевые задержки мессенджера
-    }
-}
-
-// Функция приема и декомпозиции входящих данных от бота
-async function fetchTelegramUpdates() {
-    try {
-        const res = await fetch(`https://telegram.org{TG_TOKEN}/getUpdates?offset=${lastUpdateId + 1}&limit=5`);
-        if (!res.ok) return;
-        const data = await res.json();
-        
-        if (data.ok && data.result.length > 0) {
-            data.result.forEach(update => {
-                lastUpdateId = update.update_id;
-                
-                if (update.message && update.message.text && update.message.text.startsWith("GIDEON_STREAM:")) {
-                    const rawJson = update.message.text.replace("GIDEON_STREAM:", "");
-                    try {
-                        const parsed = JSON.parse(rawJson);
-                        // Проверяем, что пакет прилетел именно нам и содержит нужный тип Сфирали V-
-                        if (parsed.type === "gideon_v-") {
-                            // Восстанавливаем нормальный масштаб чисел из сжатого пакета
-                            lastReceivedData = parsed.v.map(arr => ({
-                                x: arr[0]/100, y: arr[1]/100, z: arr[2]/100, r: arr[3], g: arr[4], b: arr[5], a: 0.9
-                            }));
-                        }
-                    } catch(err) {}
-                }
-            });
-        }
-    } catch(e) {}
-}
-
-// --- ЗАХВАТ КАМЕРЫ ---
+// --- ЗАХВАТ И ОЦИФРОВКА СЕНСОРА КАМЕРЫ ---
 async function startCameraCapture() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 80, height: 60 } });
         localVideo.srcObject = stream;
         localVideo.play();
     } catch (err) {
-        netStatus.innerText = "РЕЖИМ: СИНТЕТИЧЕСКИЙ МАТРИЧНЫЙ ТЕСТ";
+        netStatus.innerText = "РЕЖИМ: МАТЕМАТИЧЕСКИЙ ТЕСТ (БЕЗ КАМЕРЫ)";
     }
 }
 
 // --- ГЛАВНЫЙ ВЫЧИСЛИТЕЛЬНЫЙ КОНВЕЙЕР ---
-let frameThrottle = 0;
-
 function runStreamingPipeline() {
+    // Очищаем оба экрана проектора перед рендером нового кадра
     glLocal.clearRect(0, 0, localCanvas.width, localCanvas.height);
     glRemote.clearRect(0, 0, remoteCanvas.width, remoteCanvas.height);
 
-    sTime += 0.007;
+    sTime += 0.006; // Постоянное фазовое авто-вращение Сфирали
 
     const cxL = localCanvas.width / 2; const cyL = localCanvas.height / 2;
     const cxR = remoteCanvas.width / 2; const cyR = remoteCanvas.height / 2;
@@ -154,6 +63,7 @@ function runStreamingPipeline() {
     const scaleL = Math.min(localCanvas.width, localCanvas.height) / 4;
     const scaleR = Math.min(remoteCanvas.width, remoteCanvas.height) / 4;
 
+    // Извлекаем пиксели из камеры во внутренний буфер
     let pixelData = null;
     if (localVideo.readyState >= 2) {
         hCtx.clearRect(0, 0, 80, 60);
@@ -161,17 +71,21 @@ function runStreamingPipeline() {
         pixelData = hCtx.getImageData(0, 0, 80, 60).data;
     }
 
-    let outgoingVoxelsPack = [];
+    let outgoingVoxelsPack = []; // Массив для сжатого сетевого пакета
 
-    // 1. ИСХОДЯЩИЙ ПОТОК (Генерация 50% Сфирали V-)
+    // --- БЛОК А: ИСХОДЯЩИЙ ПОТОК ---
+    // Мы генерируем воксели СТРОГО для левого полувитка (t от -1.0 до 0.0)
     for (let i = 0; i < DENSITY; i++) {
-        let t = (i / (DENSITY - 1)) - 1.0; 
+        let t = (i / (DENSITY - 1)) - 1.0; // t бежит строго от -1.0 до 0.0
 
+        // Извлекаем левую 3D точку из оригинального сфирального ядра кодека
         const leftVoxel = SfiralP2P.getLeftStreamVoxel(t, sTime);
-        const screenX = cxL + leftVoxel.x * scaleL;
-        const screenY = cyL + leftVoxel.y * scaleL - (t * 40);
 
-        let r = 31, g = 119, b = 180, a = 0.85; 
+        // Проекция 3D -> 2D экрана
+        const screenX = cxL + leftVoxel.x * scaleL;
+        const screenY = cyL + leftVoxel.y * scaleL - (t * 40); // Высотный сдвиг
+
+        let r = 31, g = 119, b = 180, a = 0.85; // Синий цвет V- по умолчанию
 
         if (pixelData) {
             let u = Math.floor(((SfiralP2P.R_coil - leftVoxel.x) / (SfiralP2P.R_coil * 2)) * 80);
@@ -183,48 +97,51 @@ function runStreamingPipeline() {
             a = (r + g + b) / 3 / 255;
         }
 
-        if (a > 0.1) {
+        // Отрисовываем левый виток в окне "Трансляция"
+        if (a > 0.08) {
             glLocal.beginPath();
             glLocal.arc(screenX, screenY, 3.5, 0, 2 * Math.PI);
             glLocal.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
             glLocal.fill();
 
-            outgoingVoxelsPack.push({ x: leftVoxel.x, y: leftVoxel.y, z: t, r, g, b });
+            // Сохраняем левую точку в виртуальный сетевой пакет
+            outgoingVoxelsPack.push({ x: leftVoxel.x, y: leftVoxel.y, z: t, r, g, b, a });
         }
     }
 
-    // Дросселирование отправки в Telegram (раз в 15 кадров, чтобы бот не спамил)
-    frameThrottle++;
-    if (frameThrottle >= 15 && outgoingVoxelsPack.length > 0) {
-        sendSfiralDataViaTG(outgoingVoxelsPack);
-        frameThrottle = 0;
-    }
+    // ИНЖЕНЕРНЫЙ МОД: Замыкаем поток на себя, чтобы протестировать 50% регенерацию без интернета
+    let lastReceivedData = outgoingVoxelsPack;
 
-    // 2. ВХОДЯЩИЙ ПОТОК И РЕГЕНЕРАЦИЯ ИЗ TELEGRAM
+    // --- БЛОК Б: ВХОДЯЩИЙ ПОТОК И РЕГЕНЕРАЦИЯ ---
     if (lastReceivedData && lastReceivedData.length > 0) {
         lastReceivedData.forEach(voxel => {
-            // Отрисовка принятого левого витка V-
+            // 1. Отрисовываем "принятую" левую половину (V-)
             const scrLeftX = cxR + voxel.x * scaleR;
             const scrLeftY = cyR + voxel.y * scaleR - (voxel.z * 40);
 
             glRemote.beginPath();
             glRemote.arc(scrLeftX, scrLeftY, 3.5, 0, 2 * Math.PI);
-            glRemote.fillStyle = `rgba(${voxel.r}, ${voxel.g}, ${voxel.b}, 0.8)`;
+            glRemote.fillStyle = `rgba(${voxel.r}, ${voxel.g}, ${voxel.b}, ${voxel.a})`;
             glRemote.fill();
 
-            // ПОДЛИННАЯ РЕГЕНЕРАЦИЯ: Восстановление правого витка V+ по закону антисимметрии автора
+            // 2. ПОДЛИННАЯ РЕГЕНЕРАЦИЯ: Восстанавливаем правую половину (V+) на лету по закону антисимметрии
+            // Мы берем параметры левой точки и зеркально отзеркаливаем её
             const rightVoxel = SfiralP2P.reconstructRightVoxel({ x: voxel.x, y: voxel.y, zOffset: voxel.z });
+
             const scrRightX = cxR + rightVoxel.x * scaleR;
-            const scrRightY = cyR + rightVoxel.y * scaleR - ((-voxel.z) * 40); 
+            const scrRightY = cyR + rightVoxel.y * scaleR - ((-voxel.z) * 40); // Инверсия высотного знака
 
             glRemote.beginPath();
             glRemote.arc(scrRightX, scrRightY, 3.5, 0, 2 * Math.PI);
-            glRemote.fillStyle = `rgba(214, 39, 40, 0.8)`; // Окрашиваем регенерированную сторону в красный
+            // Окрашиваем регенерированный виток в канонический красный цвет автора для наглядности
+            glRemote.fillStyle = `rgba(214, 39, 40, ${voxel.a})`; 
             glRemote.fill();
         });
     }
 
+    // Непрерывный конвейер потоковой декомпозиции
     requestAnimationFrame(runStreamingPipeline);
 }
 
+// Запуск стриминг-конвейера
 runStreamingPipeline();
