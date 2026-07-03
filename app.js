@@ -1,5 +1,5 @@
 /**
- * GIDEON-Stream-Client // Сетевой координатор P2P-видеосвязи (Расширенная версия)
+ * GIDEON-Stream-Client // Сетевой координатор P2P-видеосвязи (Версия Pro v2)
  */
 
 // Селекторы интерфейса
@@ -17,7 +17,7 @@ const peerIdInput = document.getElementById('peerIdInput');
 const btnConnect = document.getElementById('btnConnect');
 const netStatus = document.getElementById('netStatus');
 
-// Новые кнопки управления
+// Кнопки управления интерфейсом
 const modeLoopBtn = document.getElementById('modeLoopBtn');
 const modeNetBtn = document.getElementById('modeNetBtn');
 const toggleCamBtn = document.getElementById('toggleCamBtn');
@@ -25,16 +25,19 @@ const networkBlock = document.getElementById('networkBlock');
 
 const DENSITY = 400; 
 let sTime = 0;
-let isCamActive = true;
-let signalMode = 'loop'; // loop (самодиагностика) или network (внешний P2P)
+
+// ИСПРАВЛЕНО: Камера по умолчанию СТРОГО ВЫКЛЮЧЕНА при старте приложения
+let isCamActive = false; 
+let signalMode = 'loop'; 
 
 let peer = null;
 let dataConnection = null;
 let lastReceivedData = null;
 
-// Стартовая конфигурация
-netStatus.innerText = "СТАТУС: РЕЖИМ САМОДИАГНОСТИКИ (АВТОНОМНО)";
-startCameraCapture();
+// Настраиваем стартовое состояние кнопки приватности
+toggleCamBtn.innerText = "Включить камеру";
+toggleCamBtn.style.borderColor = "#00ffcc";
+netStatus.innerText = "СТАТУС: РЕЖИМ САМОДИАГНОСТИКИ (МАТЕМАТИЧЕСКИЙ ТЕСТ)";
 
 function resizeViewports() {
     localCanvas.width = localCanvas.clientWidth;
@@ -53,7 +56,7 @@ modeLoopBtn.addEventListener('click', () => {
     modeLoopBtn.classList.add('active');
     modeNetBtn.classList.remove('active');
     networkBlock.style.display = 'none';
-    netStatus.innerText = "СТАТУС: РЕЖИМ САМОДИАГНОСТИКИ (АВТОНОМНО)";
+    netStatus.innerText = isCamActive ? "СТАТУС: РЕЖИМ САМОДИАГНОСТИКИ (СЕНСОР)" : "СТАТУС: РЕЖИМ САМОДИАГНОСТИКИ (МАТЕМАТИЧЕСКИЙ ТЕСТ)";
     netStatus.style.color = "#00ffcc";
     if (peer) { peer.destroy(); peer = null; }
 });
@@ -66,19 +69,19 @@ modeNetBtn.addEventListener('click', () => {
     networkBlock.style.display = 'block';
     netStatus.innerText = "СТАТУС: ПОДКЛЮЧЕНИЕ К ВНЕШНЕМУ СЕРВЕРУ...";
     netStatus.style.color = "#bd00ff";
-    initExternalNetwork(); // Ленивая инициализация P2P при запросе
+    initExternalNetwork(); 
 });
 
-// Кнопка: Включение/Выключение Веб-камеры
+// Кнопка: Осознанное управление Веб-камерой пользователем
 toggleCamBtn.addEventListener('click', () => {
     isCamActive = !isCamActive;
     if (isCamActive) {
         toggleCamBtn.innerText = "Выключить камеру";
-        toggleCamBtn.style.borderColor = "#bd00ff";
+        toggleCamBtn.style.borderColor = "#bd00ff"; // Пурпурный — сенсор в эфире
         startCameraCapture();
     } else {
         toggleCamBtn.innerText = "Включить камеру";
-        toggleCamBtn.style.borderColor = "#00ffcc";
+        toggleCamBtn.style.borderColor = "#00ffcc"; // Зеленый — полная приватность
         stopCameraCapture();
     }
 });
@@ -90,17 +93,23 @@ async function startCameraCapture() {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 80, height: 60 } });
         localVideo.srcObject = stream;
         localVideo.play();
+        if (signalMode === 'loop') netStatus.innerText = "СТАТУС: РЕЖИМ САМОДИАГНОСТИКИ (СЕНСОР)";
     } catch (err) {
         isCamActive = false;
         toggleCamBtn.innerText = "Включить камеру";
+        toggleCamBtn.style.borderColor = "#00ffcc";
+        alert("Не удалось активировать камеру. Проверьте разрешения браузера.");
     }
 }
 
 function stopCameraCapture() {
     if (localVideo.srcObject) {
+        // Физически тушим и уничтожаем все потоки камеры на аппаратном уровне
         localVideo.srcObject.getTracks().forEach(track => track.stop());
         localVideo.srcObject = null;
     }
+    localVideo.pause();
+    if (signalMode === 'loop') netStatus.innerText = "СТАТУС: РЕЖИМ САМОДИАГНОСТИКИ (МАТЕМАТИЧЕСКИЙ ТЕСТ)";
 }
 
 // --- ИНИЦИАЛИЗАЦИЯ ВНЕШНЕГО СИГНАЛА ---
@@ -164,7 +173,8 @@ function runStreamingPipeline() {
     const scaleR = Math.min(remoteCanvas.width, remoteCanvas.height) / 4;
 
     let pixelData = null;
-    // Считываем пиксели только если камера реально включена и выдает кадры
+    
+    // ИСПРАВЛЕНО: Считываем пиксели ТОЛЬКО если флаг камеры активен, она включена и выдает кадры
     if (isCamActive && localVideo.readyState >= 2 && localVideo.srcObject) {
         hCtx.clearRect(0, 0, 80, 60);
         hCtx.drawImage(localVideo, 0, 0, 80, 60);
@@ -205,10 +215,8 @@ function runStreamingPipeline() {
 
     // РАСПРЕДЕЛЕНИЕ СИГНАЛА НА ОСНОВЕ ТУМБЛЕРА РЕЖИМА
     if (signalMode === 'loop') {
-        // Если включена самодиагностика — мгновенно замыкаем поток на правое окно
         lastReceivedData = outgoingVoxelsPack;
     } else if (signalMode === 'network' && dataConnection && dataConnection.open && outgoingVoxelsPack.length > 0) {
-        // Если включена сеть — отправляем 50% точек по WebRTC
         dataConnection.send({ type: 'sfiral_stream', voxels: outgoingVoxelsPack });
     }
 
