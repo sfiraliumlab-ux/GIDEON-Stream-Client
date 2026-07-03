@@ -1,5 +1,5 @@
 /**
- * GIDEON-Stream-Client // Сетевой координатор P2P-видеосвязи (Тестовый режим)
+ * GIDEON-Stream-Client // Сетевой координатор P2P-видеосвязи (Расширенная версия)
  */
 
 // Селекторы интерфейса
@@ -17,18 +17,25 @@ const peerIdInput = document.getElementById('peerIdInput');
 const btnConnect = document.getElementById('btnConnect');
 const netStatus = document.getElementById('netStatus');
 
-const DENSITY = 400; // Количество вокселей в полувитке Сфирали
+// Новые кнопки управления
+const modeLoopBtn = document.getElementById('modeLoopBtn');
+const modeNetBtn = document.getElementById('modeNetBtn');
+const toggleCamBtn = document.getElementById('toggleCamBtn');
+const networkBlock = document.getElementById('networkBlock');
+
+const DENSITY = 400; 
 let sTime = 0;
+let isCamActive = true;
+let signalMode = 'loop'; // loop (самодиагностика) или network (внешний P2P)
 
-// Устанавливаем понятные статусы для новичка
-myIdDisplay.innerText = "GIDEON_LOCAL_NODE";
+let peer = null;
+let dataConnection = null;
+let lastReceivedData = null;
+
+// Стартовая конфигурация
 netStatus.innerText = "СТАТУС: РЕЖИМ САМОДИАГНОСТИКИ (АВТОНОМНО)";
-netStatus.style.color = "#00ffcc";
-
-// Автоматически запускаем сенсор камеры
 startCameraCapture();
 
-// Подгонка размеров окон вывода
 function resizeViewports() {
     localCanvas.width = localCanvas.clientWidth;
     localCanvas.height = localCanvas.clientHeight;
@@ -38,24 +45,117 @@ function resizeViewports() {
 window.addEventListener('resize', resizeViewports);
 resizeViewports();
 
-// --- ЗАХВАТ И ОЦИФРОВКА СЕНСОРА КАМЕРЫ ---
+// --- УПРАВЛЕНИЕ РЕЖИМАМИ РАБОТЫ (ИНТЕРФЕЙС) ---
+
+// Тумблер: Включение Самодиагностики
+modeLoopBtn.addEventListener('click', () => {
+    signalMode = 'loop';
+    modeLoopBtn.classList.add('active');
+    modeNetBtn.classList.remove('active');
+    networkBlock.style.display = 'none';
+    netStatus.innerText = "СТАТУС: РЕЖИМ САМОДИАГНОСТИКИ (АВТОНОМНО)";
+    netStatus.style.color = "#00ffcc";
+    if (peer) { peer.destroy(); peer = null; }
+});
+
+// Тумблер: Включение Внешнего Сигнала
+modeNetBtn.addEventListener('click', () => {
+    signalMode = 'network';
+    modeNetBtn.classList.add('active');
+    modeLoopBtn.classList.remove('active');
+    networkBlock.style.display = 'block';
+    netStatus.innerText = "СТАТУС: ПОДКЛЮЧЕНИЕ К ВНЕШНЕМУ СЕРВЕРУ...";
+    netStatus.style.color = "#bd00ff";
+    initExternalNetwork(); // Ленивая инициализация P2P при запросе
+});
+
+// Кнопка: Включение/Выключение Веб-камеры
+toggleCamBtn.addEventListener('click', () => {
+    isCamActive = !isCamActive;
+    if (isCamActive) {
+        toggleCamBtn.innerText = "Выключить камеру";
+        toggleCamBtn.style.borderColor = "#bd00ff";
+        startCameraCapture();
+    } else {
+        toggleCamBtn.innerText = "Включить камеру";
+        toggleCamBtn.style.borderColor = "#00ffcc";
+        stopCameraCapture();
+    }
+});
+
+// --- РАБОТА С СЕНСОРОМ КАМЕРЫ ---
+
 async function startCameraCapture() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 80, height: 60 } });
         localVideo.srcObject = stream;
         localVideo.play();
     } catch (err) {
-        netStatus.innerText = "РЕЖИМ: МАТЕМАТИЧЕСКИЙ ТЕСТ (БЕЗ КАМЕРЫ)";
+        isCamActive = false;
+        toggleCamBtn.innerText = "Включить камеру";
     }
 }
 
+function stopCameraCapture() {
+    if (localVideo.srcObject) {
+        localVideo.srcObject.getTracks().forEach(track => track.stop());
+        localVideo.srcObject = null;
+    }
+}
+
+// --- ИНИЦИАЛИЗАЦИЯ ВНЕШНЕГО СИГНАЛА ---
+
+function initExternalNetwork() {
+    if (peer) return;
+    
+    peer = new Peer({
+        host: '://peerjs.com',
+        port: 443,
+        secure: true,
+        debug: 1
+    });
+
+    peer.on('open', (id) => {
+        myIdDisplay.innerText = id;
+        if (signalMode === 'network') {
+            netStatus.innerText = "СТАТУС: В СЕТИ, ВНЕШНИЙ АДРЕС ПОЛУЧЕН";
+            netStatus.style.color = "#00ffcc";
+        }
+    });
+
+    peer.on('connection', (conn) => {
+        dataConnection = conn;
+        setupConnectionHandlers();
+    });
+}
+
+btnConnect.addEventListener('click', () => {
+    const remoteId = peerIdInput.value.trim();
+    if (!remoteId || !peer) return;
+    netStatus.innerText = "СТАТУС: ПОИСК УЗЛА СВЯЗИ...";
+    dataConnection = peer.connect(remoteId);
+    setupConnectionHandlers();
+});
+
+function setupConnectionHandlers() {
+    dataConnection.on('open', () => {
+        netStatus.innerText = `СТАТУС: P2P СЕССИЯ АКТИВНА [УЗЕЛ: ${dataConnection.peer.substring(0,6)}]`;
+        netStatus.style.color = "#bd00ff";
+    });
+    dataConnection.on('data', (data) => {
+        if (signalMode === 'network' && data && data.type === 'sfiral_stream') {
+            lastReceivedData = data.voxels;
+        }
+    });
+}
+
 // --- ГЛАВНЫЙ ВЫЧИСЛИТЕЛЬНЫЙ КОНВЕЙЕР ---
+
 function runStreamingPipeline() {
-    // Очищаем оба экрана проектора перед рендером нового кадра
     glLocal.clearRect(0, 0, localCanvas.width, localCanvas.height);
     glRemote.clearRect(0, 0, remoteCanvas.width, remoteCanvas.height);
 
-    sTime += 0.006; // Постоянное фазовое авто-вращение Сфирали
+    sTime += 0.006; 
 
     const cxL = localCanvas.width / 2; const cyL = localCanvas.height / 2;
     const cxR = remoteCanvas.width / 2; const cyR = remoteCanvas.height / 2;
@@ -63,29 +163,25 @@ function runStreamingPipeline() {
     const scaleL = Math.min(localCanvas.width, localCanvas.height) / 4;
     const scaleR = Math.min(remoteCanvas.width, remoteCanvas.height) / 4;
 
-    // Извлекаем пиксели из камеры во внутренний буфер
     let pixelData = null;
-    if (localVideo.readyState >= 2) {
+    // Считываем пиксели только если камера реально включена и выдает кадры
+    if (isCamActive && localVideo.readyState >= 2 && localVideo.srcObject) {
         hCtx.clearRect(0, 0, 80, 60);
         hCtx.drawImage(localVideo, 0, 0, 80, 60);
         pixelData = hCtx.getImageData(0, 0, 80, 60).data;
     }
 
-    let outgoingVoxelsPack = []; // Массив для сжатого сетевого пакета
+    let outgoingVoxelsPack = [];
 
-    // --- БЛОК А: ИСХОДЯЩИЙ ПОТОК ---
-    // Мы генерируем воксели СТРОГО для левого полувитка (t от -1.0 до 0.0)
+    // --- БЛОК А: ИСХОДЯЩИЙ ПОТОК (V-) ---
     for (let i = 0; i < DENSITY; i++) {
-        let t = (i / (DENSITY - 1)) - 1.0; // t бежит строго от -1.0 до 0.0
+        let t = (i / (DENSITY - 1)) - 1.0; 
 
-        // Извлекаем левую 3D точку из оригинального сфирального ядра кодека
         const leftVoxel = SfiralP2P.getLeftStreamVoxel(t, sTime);
-
-        // Проекция 3D -> 2D экрана
         const screenX = cxL + leftVoxel.x * scaleL;
-        const screenY = cyL + leftVoxel.y * scaleL - (t * 40); // Высотный сдвиг
+        const screenY = cyL + leftVoxel.y * scaleL - (t * 40);
 
-        let r = 31, g = 119, b = 180, a = 0.85; // Синий цвет V- по умолчанию
+        let r = 31, g = 119, b = 180, a = 0.85; 
 
         if (pixelData) {
             let u = Math.floor(((SfiralP2P.R_coil - leftVoxel.x) / (SfiralP2P.R_coil * 2)) * 80);
@@ -97,25 +193,28 @@ function runStreamingPipeline() {
             a = (r + g + b) / 3 / 255;
         }
 
-        // Отрисовываем левый виток в окне "Трансляция"
         if (a > 0.08) {
             glLocal.beginPath();
             glLocal.arc(screenX, screenY, 3.5, 0, 2 * Math.PI);
             glLocal.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
             glLocal.fill();
 
-            // Сохраняем левую точку в виртуальный сетевой пакет
             outgoingVoxelsPack.push({ x: leftVoxel.x, y: leftVoxel.y, z: t, r, g, b, a });
         }
     }
 
-    // ИНЖЕНЕРНЫЙ МОД: Замыкаем поток на себя, чтобы протестировать 50% регенерацию без интернета
-    let lastReceivedData = outgoingVoxelsPack;
+    // РАСПРЕДЕЛЕНИЕ СИГНАЛА НА ОСНОВЕ ТУМБЛЕРА РЕЖИМА
+    if (signalMode === 'loop') {
+        // Если включена самодиагностика — мгновенно замыкаем поток на правое окно
+        lastReceivedData = outgoingVoxelsPack;
+    } else if (signalMode === 'network' && dataConnection && dataConnection.open && outgoingVoxelsPack.length > 0) {
+        // Если включена сеть — отправляем 50% точек по WebRTC
+        dataConnection.send({ type: 'sfiral_stream', voxels: outgoingVoxelsPack });
+    }
 
-    // --- БЛОК Б: ВХОДЯЩИЙ ПОТОК И РЕГЕНЕРАЦИЯ ---
+    // --- БЛОК Б: ВХОДЯЩИЙ ПОТОК И СФИРАЛЬНАЯ РЕГЕНЕРАЦИЯ ---
     if (lastReceivedData && lastReceivedData.length > 0) {
         lastReceivedData.forEach(voxel => {
-            // 1. Отрисовываем "принятую" левую половину (V-)
             const scrLeftX = cxR + voxel.x * scaleR;
             const scrLeftY = cyR + voxel.y * scaleR - (voxel.z * 40);
 
@@ -124,24 +223,18 @@ function runStreamingPipeline() {
             glRemote.fillStyle = `rgba(${voxel.r}, ${voxel.g}, ${voxel.b}, ${voxel.a})`;
             glRemote.fill();
 
-            // 2. ПОДЛИННАЯ РЕГЕНЕРАЦИЯ: Восстанавливаем правую половину (V+) на лету по закону антисимметрии
-            // Мы берем параметры левой точки и зеркально отзеркаливаем её
             const rightVoxel = SfiralP2P.reconstructRightVoxel({ x: voxel.x, y: voxel.y, zOffset: voxel.z });
-
             const scrRightX = cxR + rightVoxel.x * scaleR;
-            const scrRightY = cyR + rightVoxel.y * scaleR - ((-voxel.z) * 40); // Инверсия высотного знака
+            const scrRightY = cyR + rightVoxel.y * scaleR - ((-voxel.z) * 40); 
 
             glRemote.beginPath();
             glRemote.arc(scrRightX, scrRightY, 3.5, 0, 2 * Math.PI);
-            // Окрашиваем регенерированный виток в канонический красный цвет автора для наглядности
             glRemote.fillStyle = `rgba(214, 39, 40, ${voxel.a})`; 
             glRemote.fill();
         });
     }
 
-    // Непрерывный конвейер потоковой декомпозиции
     requestAnimationFrame(runStreamingPipeline);
 }
 
-// Запуск стриминг-конвейера
 runStreamingPipeline();
