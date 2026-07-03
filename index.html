@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GIDEON // Stream Client P2P</title>
+    <title>GIDEON // Telegram Stream Client</title>
     <style>
         :root {
             --bg-deep: #04060a;
@@ -74,35 +74,33 @@
         #hiddenCanvas { display: none; }
     </style>
     
-    <!-- АВТОНОМНЫЙ ИНЖЕНЕРНЫЙ МОД: Встроенное мини-зеркало PeerJS для обхода блокировок CDN -->
-    <script>
-        !function(e,t){"object"==typeof exports&&"undefined"!=typeof module?t(exports):"function"==typeof define&&define.amd?define(["exports"],t):t((e=e||self).PeerJS={})}(this,function(e){"use strict";var t=function(){function e(e,t){this._events=this._events||{},this._maxListeners=this._maxListeners||void 0,this.addNode(e,t)}return e.prototype.addNode=function(e,t){return this._events[e]?("function"==typeof this._events[e]?this._events[e]=[this._events[e],t]:this._events[e].push(t),this):(this._events[e]=t,this)},e}();window.Peer=function(e,t){if(!(this instanceof Peer))return new Peer(e,t);t=t||{},this.options=Object.assign({host:"0.peerjs.com",port:443,secure:!0,path:"/",debug:0},t),this.id=e||null,this._openServerConnection()};Peer.prototype._openServerConnection=function(){var e=this,t=(this.options.secure?"wss://":"ws://")+this.options.host+":"+this.options.port+this.options.path+"peerjs?key=peerjs";this._socket=new WebSocket(t),this._socket.onopen=function(){var t=e.id?{type:"OPEN",id:e.id}:{type:"OPEN"};e._socket.send(JSON.stringify(t))},this._socket.onmessage=function(t){var n=JSON.parse(t.data);if("OPEN"===n.type)e.id=n.id,e._initialize();else if("OPEN_ERROR"===n.type)e.emit("error",new Error("ID уже занят")),e._socket.close();else if(e._conn&&"DATA"===n.type)e._conn.emit("data",n.data)},this._socket.onerror=function(t){e.emit("error",t)}},Peer.prototype._initialize=function(){var e=this;setTimeout(function(){if(typeof e._onOpenReady=="function")e._onOpenReady(e.id)},50)},Peer.prototype.connect=function(e){var t=this;this._conn={_events:{},on:function(e,t){this._events[e]=t},emit:function(e,t){if(this._events[e])this._events[e](t)},send:function(e){t._socket.send(JSON.stringify({type:"DATA",dst:this.peer,data:e}))},peer:e};return setTimeout(function(){if(t._conn._events.open)t._conn._events.open()},100),this._conn},Peer.prototype.on=function(e,t){"open"===e&&(this._onOpenReady=t),"connection"===e&&(this._onConnectionReady=t)},Peer.prototype.emit=function(e,t){};e.Peer=window.Peer});
-    </script>
+    <!-- Подключаем официальный скрипт Telegram WebApp для интеграции интерфейса внутрь мессенджера -->
+    <script src="https://telegram.org"></script>
 </head>
 <body>
 
     <header class="header">
-        <h1>GIDEON // P2P Сфиральный Кодек</h1>
-        <div id="netStatus" style="font-size: 0.8rem; font-family: monospace; color: #52648c;">СТАТУС: ПОДКЛЮЧЕНИЕ К СЕТИ...</div>
+        <h1>GIDEON // Telegram P2P Кодек</h1>
+        <div id="netStatus" style="font-size: 0.8rem; font-family: monospace; color: #52648c;">СТАТУС: ИНИЦИАЛИЗАЦИЯ TELEGRAM...</div>
     </header>
 
     <div class="main-grid">
         <aside class="telecom-panel">
             <div class="id-box">
-                <div>ВАШ АДРЕС В СЕТИ (ID):</div>
-                <div id="myId" class="id-val">ГЕНЕРАЦИЯ...</div>
+                <div>ВАШ TELEGRAM АДРЕС (USER ID):</div>
+                <div id="myId" class="id-val">ОЖИДАНИЕ TG...</div>
             </div>
 
             <div>
                 <div style="font-size: 0.75rem; text-transform: uppercase; color: #52648c; margin-bottom: 5px; font-family: monospace;">Вызов абонента</div>
-                <input type="text" id="peerIdInput" placeholder="Вставьте ID собеседника...">
-                <button id="btnConnect">Установить P2P Сессию</button>
+                <input type="text" id="peerIdInput" placeholder="Введите Chat ID собеседника...">
+                <button id="btnConnect">Связать каналы через TG</button>
             </div>
 
             <div class="id-box" style="margin-top: auto; font-size: 0.8rem;">
-                <div style="color: var(--neon-purple); font-weight: bold;">МЕТРИКА СЖАТИЯ:</div>
-                <div style="margin-top: 5px;">Передача по сети: <span style="color: #ff4444; font-weight: bold;">50% (V-)</span></div>
-                <div>Регенерация: <span style="color: var(--neon-cyan); font-weight: bold;">100% (V+ Антисимметрия)</span></div>
+                <div style="color: var(--neon-purple); font-weight: bold;">МЕТРИКА СЖАТИЯ СФИРАЛИ:</div>
+                <div style="margin-top: 5px;">Передача по сети: <span style="color: #ff4444; font-weight: bold;">50% (Левый виток)</span></div>
+                <div>Регенерация: <span style="color: var(--neon-cyan); font-weight: bold;">100% (Антисимметрия на клиенте)</span></div>
             </div>
 
             <video id="localVideo" autoplay playsinline muted></video>
@@ -111,17 +109,17 @@
 
         <main class="projector-zone">
             <div class="viewport-box">
-                <div class="viewport-tag" style="color: #ff4444;">[ТРАНСЛЯЦИЯ] Исходящий поток V-</div>
+                <div class="viewport-tag" style="color: #ff4444;">[ТРАНСЛЯЦИЯ] Входной поток V-</div>
                 <canvas id="localCanvas"></canvas>
             </div>
             <div class="viewport-box">
-                <div class="viewport-tag" style="color: var(--neon-cyan);">[ПРИЕМ] Реконструированная голограмма</div>
+                <div class="viewport-tag" style="color: var(--neon-cyan);">[ПРИЕМ] Восстановленная голограмма Telegram</div>
                 <canvas id="remoteCanvas"></canvas>
             </div>
         </main>
     </div>
 
-    <!-- Архитектурные модули Сфирали автора -->
+    <!-- Модули архитектуры Сфирали автора -->
     <script src="./sfiral-p2p.js"></script>
     <script src="./app.js"></script>
 </body>
