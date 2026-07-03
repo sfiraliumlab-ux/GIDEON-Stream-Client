@@ -57,7 +57,6 @@
         .projector-zone {
             flex-grow: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 20px;
             background: radial-gradient(circle at center, #0b1124 0%, #03050a 100%);
-            box-sizing: border-box;
         }
         .viewport-box {
             position: relative; background: rgba(4, 6, 10, 0.7); border: 1px solid var(--border);
@@ -74,8 +73,9 @@
         #localVideo { width: 100%; max-height: 100px; border-radius: 4px; display: none; margin-top: auto; }
         #hiddenCanvas { display: none; }
     </style>
-    <!-- ОБНОВЛЕНО: Подключение стабильного CDN репозитория библиотеки PeerJS с защитой от блокировок -->
-    <script src="https://cloudflare.com" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    
+    <!-- ИСПРАВЛЕНО: Подключаем библиотеки с явным указанием протокола HTTPS -->
+    <script src="https://cloudflare.com"></script>
 </head>
 <body>
 
@@ -85,7 +85,6 @@
     </header>
 
     <div class="main-grid">
-        <!-- ПАНЕЛЬ СВЯЗИ -->
         <aside class="telecom-panel">
             <div class="id-box">
                 <div>ВАШ АДРЕС В СЕТИ (ID):</div>
@@ -108,7 +107,6 @@
             <canvas id="hiddenCanvas" width="80" height="60"></canvas>
         </aside>
 
-        <!-- ЗОНА 3D ПРОЕКЦИЙ -->
         <main class="projector-zone">
             <div class="viewport-box">
                 <div class="viewport-tag" style="color: #ff4444;">[ТРАНСЛЯЦИЯ] Исходящий поток V-</div>
@@ -121,8 +119,8 @@
         </main>
     </div>
 
-    <!-- Подключение модулей архитектуры -->
-    <script src="sfiral-p2p.js"></script>
-    <script src="app.js"></script>
+    <!-- ИСПРАВЛЕНО: Явные относительные пути для надежной сборки GitHub Pages -->
+    <script src="./sfiral-p2p.js"></script>
+    <script src="./app.js"></script>
 </body>
 </html>
