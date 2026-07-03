@@ -1,21 +1,23 @@
-MIT License
+GIDEON STREAM CLIENT NON-COMMERCIAL & ETHICAL SOURCE LICENSE (v1.0)
+Copyright (c) 2026 Sfiralium Lab / Author of the Concept: Oleg S. Basargin
 
-Copyright (c) 2026 Станислав
+1. НЕКОММЕРЧЕСКОЕ ИСПОЛЬЗОВАНИЕ: Данное программное обеспечение полностью свободно для копирования, изучения, модификации и использования в личных, образовательных, академических и иных некоммерческих целях.
+2. КОММЕРЧЕСКИЕ ОГРАНИЧЕНИЯ: Любое коммерческое использование, включая, но не ограничиваясь: интеграция в платные программные продукты, использование в архитектурах коммерческих систем видеосвязи, монетизация сервисов на базе данного P2P-кодека, СТРОГО ЗАПРЕЩЕНО без предварительного письменного согласия и заключения лицензионного договора с автором концепции Сфирали — Олегом Сергеевичем Басаргиным.
+3. ЭТИЧЕСКИЕ ОГРАНИЧЕНИЯ: Данный код и топология не могут быть использованы в военных целях, системах вооружения, системах массовой слежки или для нанесения вреда живым существам.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+===============================================================================
+OFFICIAL ENGLISH TEXT (Legally Binding)
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+By using, copying, or distributing this Software, you agree to the following terms:
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+1. NON-COMMERCIAL USE PERMITTED
+The Software, including its mathematical models of the "Sphiral" P2P codec, is completely free for personal, educational, research, academic, and non-commercial development. 
+
+2. COMMERCIAL RESTRICTIONS (PRIOR AUTHOR CONSENT REQUIRED)
+Any commercial exploitation, commercialization, or deployment of this Software is STRICTLY PROHIBITED without the express prior written consent of the Author of the Concept — Oleg S. Basargin. 
+Commercial exploitation includes, but is not limited to:
+   a) Embedding this P2P streaming code into proprietary hardware or telecom architectures.
+   b) Incorporating the Software into paid services, commercial neural networks, or SaaS communication platforms.
+
+3. ETHICAL USE CLAUSE
+The Software and its topological principles shall not be used, directly or indirectly, for military purposes, weapon systems design, or mass surveillance infrastructure.
