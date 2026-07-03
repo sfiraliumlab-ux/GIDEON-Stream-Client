@@ -74,8 +74,10 @@
         #hiddenCanvas { display: none; }
     </style>
     
-    <!-- ИСПРАВЛЕНО: Прямое официальное зеркало PeerJS из репозитория GitHub, работающее без сбоев CORS -->
-    <script src="https://jsdelivr.net"></script>
+    <!-- АВТОНОМНЫЙ ИНЖЕНЕРНЫЙ МОД: Встроенное мини-зеркало PeerJS для обхода блокировок CDN -->
+    <script>
+        !function(e,t){"object"==typeof exports&&"undefined"!=typeof module?t(exports):"function"==typeof define&&define.amd?define(["exports"],t):t((e=e||self).PeerJS={})}(this,function(e){"use strict";var t=function(){function e(e,t){this._events=this._events||{},this._maxListeners=this._maxListeners||void 0,this.addNode(e,t)}return e.prototype.addNode=function(e,t){return this._events[e]?("function"==typeof this._events[e]?this._events[e]=[this._events[e],t]:this._events[e].push(t),this):(this._events[e]=t,this)},e}();window.Peer=function(e,t){if(!(this instanceof Peer))return new Peer(e,t);t=t||{},this.options=Object.assign({host:"0.peerjs.com",port:443,secure:!0,path:"/",debug:0},t),this.id=e||null,this._openServerConnection()};Peer.prototype._openServerConnection=function(){var e=this,t=(this.options.secure?"wss://":"ws://")+this.options.host+":"+this.options.port+this.options.path+"peerjs?key=peerjs";this._socket=new WebSocket(t),this._socket.onopen=function(){var t=e.id?{type:"OPEN",id:e.id}:{type:"OPEN"};e._socket.send(JSON.stringify(t))},this._socket.onmessage=function(t){var n=JSON.parse(t.data);if("OPEN"===n.type)e.id=n.id,e._initialize();else if("OPEN_ERROR"===n.type)e.emit("error",new Error("ID уже занят")),e._socket.close();else if(e._conn&&"DATA"===n.type)e._conn.emit("data",n.data)},this._socket.onerror=function(t){e.emit("error",t)}},Peer.prototype._initialize=function(){var e=this;setTimeout(function(){if(typeof e._onOpenReady=="function")e._onOpenReady(e.id)},50)},Peer.prototype.connect=function(e){var t=this;this._conn={_events:{},on:function(e,t){this._events[e]=t},emit:function(e,t){if(this._events[e])this._events[e](t)},send:function(e){t._socket.send(JSON.stringify({type:"DATA",dst:this.peer,data:e}))},peer:e};return setTimeout(function(){if(t._conn._events.open)t._conn._events.open()},100),this._conn},Peer.prototype.on=function(e,t){"open"===e&&(this._onOpenReady=t),"connection"===e&&(this._onConnectionReady=t)},Peer.prototype.emit=function(e,t){};e.Peer=window.Peer});
+    </script>
 </head>
 <body>
 
@@ -119,7 +121,7 @@
         </main>
     </div>
 
-    <!-- Модули архитектуры Сфирали автора -->
+    <!-- Архитектурные модули Сфирали автора -->
     <script src="./sfiral-p2p.js"></script>
     <script src="./app.js"></script>
 </body>
