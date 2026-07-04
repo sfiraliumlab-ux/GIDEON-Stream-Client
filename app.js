@@ -1,5 +1,5 @@
 /**
- * GIDEON-Stream-Client v4.0 // Фрактальный кодек рекурсивного сгущения растра (Финальная сборка)
+ * GIDEON-Stream-Client v4.1 // Исправленный кодек сквозного сфирального кодирования
  */
 
 const localCanvas = document.getElementById('localCanvas');
@@ -18,21 +18,20 @@ const btnPack = document.getElementById('btnPack');
 const fileImport = document.getElementById('fileImport');
 const netStatus = document.getElementById('netStatus');
 
-// Конфигурация высокой плотности матрицы сенсора
+// Габариты матрицы сканирования
 const CAM_W = 80;
 const CAM_H = 60;
+const TOTAL_POINTS = CAM_W * CAM_H; // Ровно 4800 уникальных точек
 let sTime = 0;
 let isCamActive = false; 
 
 let outgoingVoxelsPack = []; 
 let lastReceivedData = null;  
 
-// Константы оригинальной Сфирали автора
 const R_COIL = 1.8;
 const HEIGHT_COIL = 1.2;
 const HEIGHT_S = 0.4;
 const S_ARC_RATIO = 0.3;
-const PHI = (1 + Math.sqrt(5)) / 2; // Золотое сечение
 
 function resizeViewports() {
     localCanvas.width = localCanvas.clientWidth; localCanvas.height = localCanvas.clientHeight;
@@ -57,33 +56,33 @@ toggleCamBtn.addEventListener('click', () => {
     }
 });
 
-// Кнопка запаковки фрактальной матрицы
+// Кнопка запаковки
 btnPack.addEventListener('click', () => {
     if (outgoingVoxelsPack.length === 0) return alert("Конвейер пуст. Включите камеру.");
     const blob = new Blob([JSON.stringify(outgoingVoxelsPack)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url;
-    a.download = `gideon_fractal_v4_${Date.now()}.json`;
+    a.download = `gideon_correct_matrix_${Date.now()}.json`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-    netStatus.innerText = "СТАТУС: ФРАКТАЛЬНАЯ МАТРИЦА СФИРАЛИ УСПЕШНО СОХРАНЕНА"; netStatus.style.color = "#bd00ff";
+    netStatus.innerText = "СТАТУС: МАТРИЦА СФИРАЛИ УСПЕШНО СОХРАНЕНА"; netStatus.style.color = "#bd00ff";
 });
 
 // Операция импорта файла
 fileImport.addEventListener('change', (e) => {
-    const file = e.target.files[0]; 
+    const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (event) => {
         try {
             lastReceivedData = JSON.parse(event.target.result);
-            netStatus.innerText = "СТАТУС: ВНЕШНИЙ СИГНАЛ ПРИНЯТ. ФРАКТАЛЬНОЕ СГУЩЕНИЕ КАДРА ВЫПОЛНЕНА";
+            netStatus.innerText = "СТАТУС: ВНЕШНИЙ СИГНАЛ ПРИНЯТ. РЕГЕНЕРАЦИЯ ВЫПОЛНЕНА";
             netStatus.style.color = "#00ffcc";
         } catch(err) { alert("Ошибка файла Сфирали"); }
     };
     reader.readAsText(file);
 });
 
-// --- МАТЕМАТИЧЕСКИЙ ОПЕРАТОР СФИРАЛИ (МАКРО-УРОВЕНЬ) ---
+// --- МАТЕМАТИЧЕСКИЙ ОПЕРАТОР СФИРАЛИ ---
 function getLeftStreamPoint(t, phase) {
     let absT = Math.abs(t);
     let x = 0, y = 0, z = 0;
@@ -103,17 +102,14 @@ function getLeftStreamPoint(t, phase) {
         z = (HEIGHT_S / 2) + (HEIGHT_COIL * localT);
     }
 
-    // Антисимметрия для левой стороны (V-)
     x = -x; y = -y; z = -z;
-
-    // Авто-вращение для диагностических нижних окон
     const rotatedX = x * Math.cos(phase) - y * Math.sin(phase);
     const rotatedY = x * Math.sin(phase) + y * Math.cos(phase);
 
     return { x: rotatedX, y: rotatedY, zOffset: z, rawX: x, rawY: y };
 }
 
-// --- ГЛАВНЫЙ ВЫЧИСЛИТЕЛЬНЫЙ И ФРАКТАЛЬНЫЙ КОНВЕЙЕР ---
+// --- ГЛАВНЫЙ ВЫЧИСЛИТЕЛЬНЫЙ КОНВЕЙЕР ---
 function runStreamingPipeline() {
     glLocal.clearRect(0, 0, localCanvas.width, localCanvas.height);
     glRemote.clearRect(0, 0, remoteCanvas.width, remoteCanvas.height);
@@ -133,37 +129,40 @@ function runStreamingPipeline() {
     }
 
     outgoingVoxelsPack = [];
-    let counter = 0;
 
-    // --- БЛОК А: СКАНИРОВАНИЕ КАДРА С УЧЕТОМ АСИММЕТРИИ ---
-    for (let v = 0; v < CAM_H; v++) {
-        for (let u = 0; u < CAM_W; u++) {
-            counter++;
-            let t = (v / (CAM_H - 1)) * 0.5 + (u / (CAM_W - 1)) * 0.5 - 1.0;
-            t = Math.max(-1.0, Math.min(0.0, t));
+    // --- БЛОК А: ИСТИННОЕ СКВОЗНОЕ ИНДЕКСИРОВАНИЕ КАДРА ---
+    // Движемся линейно от 0 до 4799. Каждая итерация — это строго ОДИН пиксель и ОДИН шаг Сфирали
+    for (let i = 0; i < TOTAL_POINTS; i++) {
+        // Рассчитываем плоские координаты u и v пикселя из сквозного индекса i
+        let v = Math.floor(i / CAM_W);
+        let u = i % CAM_W;
 
-            const voxel = getLeftStreamPoint(t, sTime);
-            let r = 31, g = 119, b = 180, a = 0.2; 
+        // Распределяем шаг t строго от -1.0 до 0.0 без дублирования координат
+        let t = (i / (TOTAL_POINTS - 1)) - 1.0;
 
-            if (pixelData) {
-                const idx = (v * CAM_W + u) * 4;
-                r = pixelData[idx]; g = pixelData[idx + 1]; b = pixelData[idx + 2];
-                r = Math.max(20, r); 
-                a = (r + g + b) / 3 / 255; a = Math.max(0.15, a);
-            }
+        const voxel = getLeftStreamPoint(t, sTime);
+        let r = 31, g = 119, b = 180, a = 0.2; 
 
-            if (counter % 6 === 0 || pixelData) {
-                const screenX = cxL + voxel.x * scaleL;
-                const screenY = cyL + voxel.y * scaleL - (t * 20);
-                glLocal.beginPath(); glLocal.arc(screenX, screenY, 2, 0, 2 * Math.PI);
-                glLocal.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`; glLocal.fill();
-            }
-
-            outgoingVoxelsPack.push({ x: voxel.x, y: voxel.y, z: t, u: u, v: v, r, g, b, a });
+        if (pixelData) {
+            const idx = (v * CAM_W + u) * 4;
+            r = pixelData[idx]; g = pixelData[idx + 1]; b = pixelData[idx + 2];
+            r = Math.max(20, r); 
+            a = (r + g + b) / 3 / 255; a = Math.max(0.15, a);
         }
+
+        // Отрисовка исходящего диагностического витка V- в Окне 2
+        if (i % 6 === 0 || pixelData) {
+            const screenX = cxL + voxel.x * scaleL;
+            const screenY = cyL + voxel.y * scaleL - (t * 20);
+            glLocal.beginPath(); glLocal.arc(screenX, screenY, 2, 0, 2 * Math.PI);
+            glLocal.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`; glLocal.fill();
+        }
+
+        // Записываем воксель. Каждый пиксель теперь намертво связан со своим уникальным t
+        outgoingVoxelsPack.push({ x: voxel.x, y: voxel.y, z: t, u: u, v: v, r, g, b, a });
     }
 
-    // --- БЛОК Б: ДЕКОДИРОВАНИЕ И РЕКУРСИВНОЕ ФРАКТАЛЬНОЕ СГУЩЕНИЕ (ОКНО 4) ---
+    // --- БЛОК Б: ДЕКОДИРОВАНИЕ И ПЛОТНАЯ СБОРКА РАСТРА КАРТИНКИ (ОКНО 4) ---
     if (lastReceivedData && lastReceivedData.length > 0) {
         const rW = reconImageCanvas.width;
         const rH = reconImageCanvas.height;
@@ -184,27 +183,14 @@ function runStreamingPipeline() {
                 glRemote.fillStyle = `rgba(214, 39, 40, 0.7)`; glRemote.fill();
             }
 
-            // ИСТИННАЯ РАЗВЕРТКА РЕКУРСИВНОГО ФРАКТАЛА В ОКНЕ 4
+            // СБОРКА ПЛОСКОГО ЭКРАНА В ОКНЕ 4
             if (voxel.u !== undefined && voxel.v !== undefined) {
+                let rectX = voxel.u * pScaleX;
+                let rectY = voxel.v * pScaleY;
                 
-                // Моделируем вложенность Сфирали второго уровня (Микро-витки)
-                // Каждая макро-точка порождает матрицу 3х3 суб-пикселей
-                for (let subY = 0; subY < 3; subY++) {
-                    for (let subX = 0; subX < 3; subX++) {
-                        
-                        // Сдвиг суб-пикселей рассчитывается через коэффициент золотого сечения (1 / PHI)
-                        // Это сглаживает ступенчатые границы "кубиков", интерполируя изображение
-                        let fractalShiftX = (subX - 1) * (pScaleX / 3) * (1 / PHI);
-                        let fractalShiftY = (subY - 1) * (pScaleY / 3) * (1 / PHI);
-
-                        let rectX = voxel.u * pScaleX + fractalShiftX;
-                        let rectY = voxel.v * pScaleY + fractalShiftY;
-
-                        // Отрисовываем плотное, сглаженное облако микро-пикселей
-                        glRecon.fillStyle = `rgba(${voxel.r}, ${voxel.g}, ${voxel.b}, ${voxel.a})`;
-                        glRecon.fillRect(rectX, rectY, Math.ceil(pScaleX / 3) + 1, Math.ceil(pScaleY / 3) + 1);
-                    }
-                }
+                glRecon.fillStyle = `rgba(${voxel.r}, ${voxel.g}, ${voxel.b}, ${voxel.a})`;
+                // Отрисовываем плотный сплошной пиксель
+                glRecon.fillRect(rectX, rectY, Math.ceil(pScaleX) + 1, Math.ceil(pScaleY) + 1);
             }
         });
     }
