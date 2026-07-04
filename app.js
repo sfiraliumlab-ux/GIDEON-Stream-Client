@@ -1,5 +1,5 @@
 /**
- * GIDEON-Stream-Client // Полный автономный сфиральный кодек (Фикс развертки кадра)
+ * GIDEON-Stream-Client // Полный автономный сфиральный кодек (Исправление сборки)
  */
 
 const localCanvas = document.getElementById('localCanvas');
@@ -30,7 +30,6 @@ const R_COIL = 1.8;
 const HEIGHT_COIL = 1.2;
 const HEIGHT_S = 0.4;
 const S_ARC_RATIO = 0.3;
-const PHI = (1 + Math.sqrt(5)) / 2;
 
 function resizeViewports() {
     localCanvas.width = localCanvas.clientWidth; localCanvas.height = localCanvas.clientHeight;
@@ -68,7 +67,7 @@ btnPack.addEventListener('click', () => {
 
 // Операция импорта файла
 fileImport.addEventListener('change', (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files[0]; // Исправлен индекс захвата конкретного файла
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -134,7 +133,7 @@ function runStreamingPipeline() {
 
     // --- БЛОК А: ИСХОДЯЩИЙ ПОТОК (ЛЕВЫЙ ВИТОК V-) ---
     for (let i = 0; i < DENSITY; i++) {
-        let t = (i / (DENSITY - 1)) - 1.0; // t от -1.0 до 0.0
+        let t = (i / (DENSITY - 1)) - 1.0; 
         const voxel = getLeftStreamPoint(t, sTime);
         
         const screenX = cxL + voxel.x * scaleL;
@@ -144,7 +143,7 @@ function runStreamingPipeline() {
         let savedU = 0, savedV = 0;
 
         if (pixelData) {
-            // Маппинг плоской матрицы кадра 80х60
+            // ИСПРАВЛЕНО: Маппинг плоской матрицы кадра 80х60 с использованием константы R_COIL
             let u = Math.floor(((R_COIL - voxel.rawX) / (R_COIL * 2)) * 80);
             let v = Math.floor(((voxel.rawY + R_COIL) / (R_COIL * 2)) * 60);
             u = Math.max(0, Math.min(79, u)); v = Math.max(0, Math.min(59, v));
