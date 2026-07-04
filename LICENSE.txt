@@ -1,23 +1,36 @@
-GIDEON STREAM CLIENT NON-COMMERCIAL & ETHICAL SOURCE LICENSE (v1.0)
+GIDEON STREAM CLIENT FRACTAL CODEC LICENSE (v4.0)
 Copyright (c) 2026 Sfiralium Lab / Author of the Concept: Oleg S. Basargin
 
+=== РУССКИЙ ПЕРЕВОД (Для ознакомления) ===
+
+Настоящая лицензия регулирует использование программного обеспечения "GIDEON-Stream-Client v4.0", включая алгоритмы макро- и микро-сфирального кодирования, а также методы фрактального сгущения растра.
+
 1. НЕКОММЕРЧЕСКОЕ ИСПОЛЬЗОВАНИЕ: Данное программное обеспечение полностью свободно для копирования, изучения, модификации и использования в личных, образовательных, академических и иных некоммерческих целях.
-2. КОММЕРЧЕСКИЕ ОГРАНИЧЕНИЯ: Любое коммерческое использование, включая, но не ограничиваясь: интеграция в платные программные продукты, использование в архитектурах коммерческих систем видеосвязи, монетизация сервисов на базе данного P2P-кодека, СТРОГО ЗАПРЕЩЕНО без предварительного письменного согласия и заключения лицензионного договора с автором концепции Сфирали — Олегом Сергеевичем Басаргиным.
+2. КОММЕРЧЕСКИЕ ОГРАНИЧЕНИЯ: Любое коммерческое использование, включая, но не ограничиваясь: интеграция в платные программные продукты, использование фрактального меш-алгоритма в архитектурах коммерческих систем видеосвязи, монетизация сервисов на базе данного кодека, СТРОГО ЗАПРЕЩЕНО без предварительного письменного согласия и заключения лицензионного договора с автором концепции Сфирали — Олегом Сергеевичем Басаргиным.
 3. ЭТИЧЕСКИЕ ОГРАНИЧЕНИЯ: Данный код и топология не могут быть использованы в военных целях, системах вооружения, системах массовой слежки или для нанесения вреда живым существам.
 
 ===============================================================================
-OFFICIAL ENGLISH TEXT (Legally Binding)
+=== OFFICIAL ENGLISH TEXT (Legally Binding) ===
 
-By using, copying, or distributing this Software, you agree to the following terms:
+By using, copying, or distributing this Software (v4.0), you agree to the following terms:
 
 1. NON-COMMERCIAL USE PERMITTED
-The Software, including its mathematical models of the "Sphiral" P2P codec, is completely free for personal, educational, research, academic, and non-commercial development. 
+The Software, including its mathematical models of the "Sphiral" topology, fractal mesh generation, and recursive sub-pixel interpolation, is completely free for personal, educational, research, academic, and non-commercial development. You may modify and experiment with the code freely.
 
 2. COMMERCIAL RESTRICTIONS (PRIOR AUTHOR CONSENT REQUIRED)
-Any commercial exploitation, commercialization, or deployment of this Software is STRICTLY PROHIBITED without the express prior written consent of the Author of the Concept — Oleg S. Basargin. 
+Any commercial exploitation, commercialization, or deployment of this Software or its architectural principles is STRICTLY PROHIBITED without the express prior written consent of the Author of the Concept — Oleg S. Basargin. 
 Commercial exploitation includes, but is not limited to:
-   a) Embedding this P2P streaming code into proprietary hardware or telecom architectures.
-   b) Incorporating the Software into paid services, commercial neural networks, or SaaS communication platforms.
+   a) Embedding this fractal streaming code or mathematical models into proprietary hardware, telecommunication nodes, or streaming server infrastructures.
+   b) Incorporating the Software into paid services, commercial neural networks, SaaS communication platforms, or retail applications.
+   c) Selling, leasing, or licensing the Software or its derivatives for profit.
+
+To negotiate commercial licensing, you must contact Oleg S. Basargin directly.
 
 3. ETHICAL USE CLAUSE
-The Software and its topological principles shall not be used, directly or indirectly, for military purposes, weapon systems design, or mass surveillance infrastructure.
+The Software and its topological/fractal principles shall not be used, directly or indirectly, for military purposes, weapon systems design, mass surveillance infrastructure, or any applications intended to cause physical harm to living beings.
+
+4. ATTRIBUTION
+Any derivative works, forks, or research papers utilizing this topology or its fractal extensions must include prominent attribution to: "Sfiralium Lab / Concept by Oleg S. Basargin".
+
+5. NO WARRANTY
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.
