@@ -70,19 +70,22 @@ btnPack.addEventListener('click', () => {
 
 // ОПЕРАЦИЯ ОБЪЕКТИВНОГО ПРИЕМА СИГНАЛА
 fileImport.addEventListener('change', (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files[0]; // Берем конкретный выбранный файл
     if (!file) return;
     
     const reader = new FileReader();
     reader.onload = (event) => {
         try {
-            // Браузер принимает внешний файл, содержащий только 50% точек левого витка!
+            // ИСПРАВЛЕНО: Читаем файл как чистый текст и переводим в массив объектов
             lastReceivedData = JSON.parse(event.target.result);
             netStatus.innerText = "СТАТУС: ВНЕШНИЙ СИГНАЛ ПРИНЯТ. ЗАПУЩЕНА 100% РЕГЕНЕРАЦИЯ";
             netStatus.style.color = "#00ffcc";
-        } catch(err) { alert("Неверный формат файла Сфирали"); }
+        } catch(err) { 
+            alert("Ошибка чтения данных. Убедитесь, что загружаете правильный .json файл Сфирали."); 
+        }
     };
-    reader.readAsDataURL(file);
+    // ИСПРАВЛЕНО: Вместо readAsDataURL используем чтение текста readAsText
+    reader.readAsText(file);
 });
 
 // --- ГЛАВНЫЙ ВЫЧИСЛИТЕЛЬНЫЙ КОНВЕЙЕР ---
@@ -136,7 +139,7 @@ function runStreamingPipeline() {
     // --- БЛОК Б: ПРИЕМ ВНЕШНЕГО СИГНАЛА И ЕГО 100% РЕГЕНЕРАЦИЯ ---
     if (lastReceivedData && lastReceivedData.length > 0) {
         lastReceivedData.forEach(voxel => {
-            // Отрисовываем то, что честно получили из файла (Левый синий виток V-)
+            // Отрисовываем то, что получили из файла (Левый синий виток V-)
             const scrLeftX = cxR + voxel.x * scaleR;
             const scrLeftY = cyR + voxel.y * scaleR - (voxel.z * 40);
 
