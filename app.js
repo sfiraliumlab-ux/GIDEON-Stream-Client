@@ -131,12 +131,12 @@ function runStreamingPipeline() {
     }
 
     outgoingVoxelsPack = [];
+    let counter = 0;
 
     // --- БЛОК А: СКАНИРОВАНИЕ ВСЕГО ПРЯМОУГОЛЬНОГО КАДРА (ПО СТРОКАМ И СТОЛБЦАМ) ---
-    // Мы пробегаем по абсолютно всем пикселям растра 80х60, захватывая ПОЛНОЕ изображение
     for (let v = 0; v < CAM_H; v++) {
-        // Мы берем только левую половину кадра по ширине (u от 0 до 40), сжимая поток на 50%
         for (let u = 0; u < CAM_W / 2; u++) {
+            counter++;
             
             // Переводим плоские координаты пикселя (u, v) в сфиральный параметр t от -1.0 до 0.0
             let t = (v / (CAM_H - 1)) * 0.5 + (u / (CAM_W / 2 - 1)) * 0.5 - 1.0;
@@ -149,21 +149,20 @@ function runStreamingPipeline() {
             if (pixelData) {
                 const idx = (v * CAM_W + u) * 4;
                 r = pixelData[idx]; g = pixelData[idx + 1]; b = pixelData[idx + 2];
-                r = Math.max(20, r); // Не даем пикселям стать совсем черными, чтобы воксель не исчез
+                r = Math.max(20, r); 
                 a = (r + g + b) / 3 / 255;
                 a = Math.max(0.15, a);
             }
 
             // Отрисовываем левый виток в диагностическом Окне 2 (снизу)
-            // Чтобы виток не выглядел кашей, прореживаем вывод на маленьком экране
-            if (i % 3 === 0 || pixelData) {
+            if (counter % 3 === 0 || pixelData) {
                 const screenX = cxL + voxel.x * scaleL;
                 const screenY = cyL + voxel.y * scaleL - (t * 20);
                 glLocal.beginPath(); glLocal.arc(screenX, screenY, 2, 0, 2 * Math.PI);
                 glLocal.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`; glLocal.fill();
             }
 
-            // ЗАПИСЫВАЕМ ПОЛНЫЙ ПАКЕТ: Теперь файл содержит 100% пикселей левой половины вашего лица!
+            // ЗАПИСЫВАЕМ ПОЛНЫЙ ПАКЕТ
             outgoingVoxelsPack.push({ x: voxel.x, y: voxel.y, z: t, u: u, v: v, r, g, b, a });
         }
     }
@@ -176,7 +175,7 @@ function runStreamingPipeline() {
         const pScaleY = rH / CAM_H;
 
         lastReceivedData.forEach((voxel, index) => {
-            // Отрисовка диагностической Сфирали в нижнем Окне 3 (прореживаем для красоты формы)
+            // Отрисовка диагностической Сфирали в нижнем Окне 3
             if (index % 4 === 0) {
                 const scrLeftX = cxR + voxel.x * scaleR;
                 const scrLeftY = cyR + voxel.y * scaleR - (voxel.z * 20);
@@ -197,11 +196,9 @@ function runStreamingPipeline() {
                 glRecon.fillStyle = `rgba(${voxel.r}, ${voxel.g}, ${voxel.b}, ${voxel.a})`;
                 glRecon.fillRect(rectX, rectY, Math.ceil(pScaleX) + 1, Math.ceil(pScaleY) + 1);
 
-                // ОБЪЕКТИВНАЯ РЕГЕНЕРАЦИЯ ПРАВОЙ СТОРОНЫ ЛИЦА:
-                // Мессенджер не передавал правую сторону! Браузер сам взял пиксели левой стороны 
-                // и зеркально достроил правую половину прямоугольного кадра по закону хиральности Сфирали!
+                // ОБЪЕКТИВНАЯ РЕГЕНЕРАЦИЯ ПРАВОЙ СТОРОНЫ ЛИЦА
                 let rectRightX = (parseFloat(CAM_W) - 1 - voxel.u) * pScaleX;
-                let rectRightY = voxel.v * pScaleY; // Симметрия лица идет по горизонтали
+                let rectRightY = voxel.v * pScaleY; 
                 
                 glRecon.fillStyle = `rgba(${voxel.r}, ${voxel.g}, ${voxel.b}, ${voxel.a})`;
                 glRecon.fillRect(rectRightX, rectRightY, Math.ceil(pScaleX) + 1, Math.ceil(pScaleY) + 1);
