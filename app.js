@@ -1,5 +1,5 @@
 /**
- * GIDEON-Stream-Client // Сетевой координатор через Четырехоконный Визуальный Мост
+ * GIDEON-Stream-Client // Сетевой координатор через Четырехоконный Визуальный Мост (Фикс развертки кадра)
  */
 
 const localCanvas = document.getElementById('localCanvas');
@@ -7,7 +7,7 @@ const glLocal = localCanvas.getContext('2d');
 const remoteCanvas = document.getElementById('remoteCanvas');
 const glRemote = remoteCanvas.getContext('2d');
 
-// Новое Окно 4 для вывода плоского восстановленного кадра
+// Окно 4 для вывода плоского восстановленного кадра
 const reconImageCanvas = document.getElementById('reconstructedImageCanvas');
 const glRecon = reconImageCanvas.getContext('2d');
 
@@ -20,7 +20,7 @@ const btnPack = document.getElementById('btnPack');
 const fileImport = document.getElementById('fileImport');
 const netStatus = document.getElementById('netStatus');
 
-const DENSITY = 600; // Повышаем плотность точек для лучшей детализации картинки
+const DENSITY = 600; // Плотность вокселей сфиральной траектории
 let sTime = 0;
 let isCamActive = false; 
 
@@ -83,16 +83,15 @@ function runStreamingPipeline() {
     glRemote.clearRect(0, 0, remoteCanvas.width, remoteCanvas.height);
     glRecon.clearRect(0, 0, reconImageCanvas.width, reconImageCanvas.height);
 
-    sTime += 0.004; // Замедляем авто-вращение для стабильности картинки
+    sTime += 0.005; // Фазовое авто-вращение нижних диагностических матриц
 
     const cxL = localCanvas.width / 2; const cyL = localCanvas.height / 2;
     const cxR = remoteCanvas.width / 2; const cyR = remoteCanvas.height / 2;
     
-    // Масштабы под маленькие нижние окна сфирали
     const scaleL = Math.min(localCanvas.width, localCanvas.height) / 3.5;
     const scaleR = Math.min(remoteCanvas.width, remoteCanvas.height) / 3.5;
 
-    // Извлечение пикселей кадра в буфер
+    // Извлечение пикселей кадра в буфер сенсора
     if (isCamActive && localVideo.readyState >= 2 && localVideo.srcObject) {
         hCtx.clearRect(0, 0, 80, 60);
         hCtx.drawImage(localVideo, 0, 0, 80, 60);
@@ -100,7 +99,7 @@ function runStreamingPipeline() {
     }
 
     outgoingVoxelsPack = []; 
-    const currentR = SfiralP2P.R_coil || 1.8;
+    const currentR = SfiralCore.R_coil || 1.8;
 
     // --- БЛОК А: ГЕНЕРАЦИЯ СЖАТОГО ВИТКА V- ---
     for (let i = 0; i < DENSITY; i++) {
@@ -111,58 +110,76 @@ function runStreamingPipeline() {
         const screenY = cyL + leftVoxel.y * scaleL - (t * 20);
 
         let r = 31, g = 119, b = 180, a = 0.85; 
+        let savedU = 0, savedV = 0;
 
         if (pixelData) {
+            // Находим плоские индексы пикселя на матрице камеры 80х60
             let u = Math.floor(((currentR - leftVoxel.x) / (currentR * 2)) * 80);
             let v = Math.floor(((leftVoxel.y + currentR) / (currentR * 2)) * 60);
             u = Math.max(0, Math.min(79, u)); v = Math.max(0, Math.min(59, v));
-            const idx = (v * 80 + u) * 4; r = pixelData[idx]; g = pixelData[idx + 1]; b = pixelData[idx + 2]; a = (r + g + b) / 3 / 255;
+            
+            savedU = u; savedV = v; // Сохраняем исходный плоский адрес пикселя для упаковки в файл
+
+            const idx = (v * 80 + u) * 4; 
+            r = pixelData[idx]; g = pixelData[idx + 1]; b = pixelData[idx + 2]; 
+            a = (r + g + b) / 3 / 255;
         }
 
         if (a > 0.08) {
             glLocal.beginPath(); glLocal.arc(screenX, screenY, 2.5, 0, 2 * Math.PI);
             glLocal.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`; glLocal.fill();
 
-            // Записываем точки в исходящий буфер
-            outgoingVoxelsPack.push({ x: leftVoxel.x, y: leftVoxel.y, z: t, r, g, b, a });
+            // ВШИВАЕМ ИНДЕКСЫ U И V В КАРТИНКУ: Теперь файл содержит и 3D физику Сфирали, и плоский адрес растра
+            outgoingVoxelsPack.push({ 
+                x: leftVoxel.x, y: leftVoxel.y, z: t, 
+                u: savedU, v: savedV, 
+                r, g, b, a 
+            });
         }
     }
 
-    // --- БЛОК Б: ПРИЕМ И ОДНОВРЕМЕННАЯ СБОРКА ПЛОСКОЙ КАРТИНКИ (ОКНО 4) ---
+    // --- БЛОК Б: ПРИЕМ ФАЙЛА, ОТРИСОВКА МАТРИЦЫ И СБОРКА ПРЯМОУГОЛЬНОГО ЭКРАНА ---
     if (lastReceivedData && lastReceivedData.length > 0) {
-        // Подготовка сетки Окна 4 для обратного рендеринга картинки
         const rW = reconImageCanvas.width;
         const rH = reconImageCanvas.height;
-        const vScale = Math.min(rW, rH) / 1.3;
+
+        // Вычисляем масштаб сетки прямоугольного Окна 4
+        const pixelScaleX = rW / 80;
+        const pixelScaleY = rH / 60;
 
         lastReceivedData.forEach(voxel => {
-            // 1. Отрисовка левого витка V- в Окне 3
+            // 1. Отрисовка левого витка V- в Окне 3 (Маленькое снизу)
             const scrLeftX = cxR + voxel.x * scaleR;
             const scrLeftY = cyR + voxel.y * scaleR - (voxel.z * 20);
             glRemote.beginPath(); glRemote.arc(scrLeftX, scrLeftY, 2.5, 0, 2 * Math.PI);
             glRemote.fillStyle = `rgba(${voxel.r}, ${voxel.g}, ${voxel.b}, ${voxel.a})`; glRemote.fill();
 
-            // 2. Восстановление правого витка V+ в Окне 3 по закону антисимметрии
+            // 2. Восстановление правого витка V+ в Окне 3 по закону антисимметрии автора
             const rightVoxel = SfiralP2P.reconstructRightVoxel({ x: voxel.x, y: voxel.y, zOffset: voxel.z });
             const scrRightX = cxR + rightVoxel.x * scaleR;
             const scrRightY = cyR + rightVoxel.y * scaleR - ((-voxel.z) * 20); 
             glRemote.beginPath(); glRemote.arc(scrRightX, scrRightY, 2.5, 0, 2 * Math.PI);
             glRemote.fillStyle = `rgba(214, 39, 40, ${voxel.a})`; glRemote.fill();
 
-            // 3. СБОРКА ОБЪЕКТИВНОГО КАДРА (ОКНО 4): Обратное развертывание 3D вокселей на 2D экран
-            // Мы берем цвета из левого сохраненного витка, а координаты рассчитываем обратно на плоскость кадра
-            let imgU = (rW / 2) + (voxel.x * vScale / (currentR * 2));
-            let imgV = (rH / 2) + (voxel.y * vScale / (currentR * 2));
+            // 3. СБОРКА ЧЕЛОВЕЧЕСКОЙ КАРТИНКИ (ОКНО 4): Восстанавливаем плоский прямоугольник кадра!
+            // Браузер берет вшитые в точки оригинальные индексы строки и столбца (u и v)
+            if (voxel.u !== undefined && voxel.v !== undefined) {
+                // Развертывание левой части изображения
+                let rectX = voxel.u * pixelScaleX;
+                let rectY = voxel.v * pixelScaleY;
 
-            glRecon.fillStyle = `rgba(${voxel.r}, ${voxel.g}, ${voxel.b}, ${voxel.a})`;
-            glRecon.fillRect(imgU, imgV, 6, 6); // Рисуем плоские пиксели восстановленной картинки
+                glRecon.fillStyle = `rgba(${voxel.r}, ${voxel.g}, ${voxel.b}, ${voxel.a})`;
+                // Отрисовываем плоский квадратный пиксель на прямоугольном экране кадра
+                glRecon.fillRect(rectX, rectY, Math.ceil(pixelScaleX) + 1, Math.ceil(pixelScaleY) + 1);
 
-            // Сборка второй половины кадра из регенерированного витка V+
-            let imgU_right = (rW / 2) + (rightVoxel.x * vScale / (currentR * 2));
-            let imgV_right = (rH / 2) + (rightVoxel.y * vScale / (currentR * 2));
-            
-            glRecon.fillStyle = `rgba(${voxel.r}, ${voxel.g}, ${voxel.b}, ${voxel.a})`;
-            glRecon.fillRect(imgU_right, imgV_right, 6, 6);
+                // РЕГЕНЕРАЦИЯ ВТОРОЙ ПОЛОВИНЫ КАРТИНКИ: 
+                // Зеркально разворачиваем плоские индексы для достраивания правой стороны лица по закону хиральности кадра
+                let rectRightX = (79 - voxel.u) * pixelScaleX;
+                let rectRightY = (59 - voxel.v) * pixelScaleY;
+
+                glRecon.fillStyle = `rgba(${voxel.r}, ${voxel.g}, ${voxel.b}, ${voxel.a})`;
+                glRecon.fillRect(rectRightX, rectRightY, Math.ceil(pixelScaleX) + 1, Math.ceil(pixelScaleY) + 1);
+            }
         });
     }
 
