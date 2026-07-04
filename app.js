@@ -1,5 +1,5 @@
 /**
- * GIDEON-Stream-Client v4.0 // Фрактальный кодек рекурсивного сгущения растра
+ * GIDEON-Stream-Client v4.0 // Фрактальный кодек рекурсивного сгущения растра (Финальная сборка)
  */
 
 const localCanvas = document.getElementById('localCanvas');
