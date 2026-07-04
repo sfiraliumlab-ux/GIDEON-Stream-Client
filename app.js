@@ -1,5 +1,5 @@
 /**
- * GIDEON-Stream-Client v4.1 // Исправленный кодек сквозного сфирального кодирования
+ * GIDEON-Stream-Client v4.2 // Честный попиксельный асимметричный кодек
  */
 
 const localCanvas = document.getElementById('localCanvas');
@@ -18,16 +18,16 @@ const btnPack = document.getElementById('btnPack');
 const fileImport = document.getElementById('fileImport');
 const netStatus = document.getElementById('netStatus');
 
-// Габариты матрицы сканирования
+// Габариты матрицы сканирования кадра
 const CAM_W = 80;
 const CAM_H = 60;
-const TOTAL_POINTS = CAM_W * CAM_H; // Ровно 4800 уникальных точек
 let sTime = 0;
 let isCamActive = false; 
 
 let outgoingVoxelsPack = []; 
 let lastReceivedData = null;  
 
+// Константы оригинальной Сфирали автора
 const R_COIL = 1.8;
 const HEIGHT_COIL = 1.2;
 const HEIGHT_S = 0.4;
@@ -62,22 +62,22 @@ btnPack.addEventListener('click', () => {
     const blob = new Blob([JSON.stringify(outgoingVoxelsPack)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url;
-    a.download = `gideon_correct_matrix_${Date.now()}.json`;
+    a.download = `gideon_asymmetric_matrix_${Date.now()}.json`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-    netStatus.innerText = "СТАТУС: МАТРИЦА СФИРАЛИ УСПЕШНО СОХРАНЕНА"; netStatus.style.color = "#bd00ff";
+    netStatus.innerText = "СТАТУС: ФАЙЛ МАТРИЦЫ УСПЕШНО СОХРАНЕН"; netStatus.style.color = "#bd00ff";
 });
 
 // Операция импорта файла
 fileImport.addEventListener('change', (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files[0]; // Исправлен индекс для жесткого перехвата первого файла
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (event) => {
         try {
             lastReceivedData = JSON.parse(event.target.result);
-            netStatus.innerText = "СТАТУС: ВНЕШНИЙ СИГНАЛ ПРИНЯТ. РЕГЕНЕРАЦИЯ ВЫПОЛНЕНА";
+            netStatus.innerText = "СТАТУС: ВНЕШНИЙ СИГНАЛ ПРИНЯТ. РЕГЕНЕРАЦИЯ КАДРА ВЫПОЛНЕНА";
             netStatus.style.color = "#00ffcc";
-        } catch(err) { alert("Ошибка файла Сфирали"); }
+        } catch(err) { alert("Ошибка чтения файла Сфирали"); }
     };
     reader.readAsText(file);
 });
@@ -106,10 +106,10 @@ function getLeftStreamPoint(t, phase) {
     const rotatedX = x * Math.cos(phase) - y * Math.sin(phase);
     const rotatedY = x * Math.sin(phase) + y * Math.cos(phase);
 
-    return { x: rotatedX, y: rotatedY, zOffset: z, rawX: x, rawY: y };
+    return { x: rotatedX, y: rotatedY, zOffset: z };
 }
 
-// --- ГЛАВНЫЙ ВЫЧИСЛИТЕЛЬНЫЙ КОНВЕЙЕР ---
+// --- ГЛАВНЫЙ ВЫЧИСЛИТЕЛЬНЫЙ И РЕКОНСТРУКЦИОННЫЙ КОНВЕЙЕР ---
 function runStreamingPipeline() {
     glLocal.clearRect(0, 0, localCanvas.width, localCanvas.height);
     glRemote.clearRect(0, 0, remoteCanvas.width, remoteCanvas.height);
@@ -129,40 +129,42 @@ function runStreamingPipeline() {
     }
 
     outgoingVoxelsPack = [];
+    let diagnosticCounter = 0;
 
-    // --- БЛОК А: ИСТИННОЕ СКВОЗНОЕ ИНДЕКСИРОВАНИЕ КАДРА ---
-    // Движемся линейно от 0 до 4799. Каждая итерация — это строго ОДИН пиксель и ОДИН шаг Сфирали
-    for (let i = 0; i < TOTAL_POINTS; i++) {
-        // Рассчитываем плоские координаты u и v пикселя из сквозного индекса i
-        let v = Math.floor(i / CAM_W);
-        let u = i % CAM_W;
+    // --- БЛОК А: ИСТИННОЕ ПОПИКСЕЛЬНОЕ СКАНИРОВАНИЕ КАДРА ---
+    // Движемся строго по строкам (v) и столбцам (u) прямоугольной сетки
+    for (let v = 0; v < CAM_H; v++) {
+        for (let u = 0; u < CAM_W; u++) {
+            diagnosticCounter++;
+            
+            // Распределяем шаг t строго от -1.0 до 0.0 пропорционально ходу луча по кадру
+            let t = -1.0 + (v / (CAM_H - 1)) * 0.5 + (u / (CAM_W - 1)) * 0.5;
+            t = Math.max(-1.0, Math.min(0.0, t));
 
-        // Распределяем шаг t строго от -1.0 до 0.0 без дублирования координат
-        let t = (i / (TOTAL_POINTS - 1)) - 1.0;
+            const voxel = getLeftStreamPoint(t, sTime);
+            let r = 31, g = 119, b = 180, a = 0.2; 
 
-        const voxel = getLeftStreamPoint(t, sTime);
-        let r = 31, g = 119, b = 180, a = 0.2; 
+            if (pixelData) {
+                const idx = (v * CAM_W + u) * 4;
+                r = pixelData[idx]; g = pixelData[idx + 1]; b = pixelData[idx + 2];
+                r = Math.max(20, r); 
+                a = (r + g + b) / 3 / 255; a = Math.max(0.15, a);
+            }
 
-        if (pixelData) {
-            const idx = (v * CAM_W + u) * 4;
-            r = pixelData[idx]; g = pixelData[idx + 1]; b = pixelData[idx + 2];
-            r = Math.max(20, r); 
-            a = (r + g + b) / 3 / 255; a = Math.max(0.15, a);
+            // Отрисовка исходящей Сфирали в нижнем Окне 2 (прореживаем для красоты линии)
+            if (diagnosticCounter % 6 === 0 || pixelData) {
+                const screenX = cxL + voxel.x * scaleL;
+                const screenY = cyL + voxel.y * scaleL - (t * 20);
+                glLocal.beginPath(); glLocal.arc(screenX, screenY, 2, 0, 2 * Math.PI);
+                glLocal.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`; glLocal.fill();
+            }
+
+            // Упаковываем пиксель. u и v жестко привязаны к цвету
+            outgoingVoxelsPack.push({ x: voxel.x, y: voxel.y, z: t, u: u, v: v, r: r, g: g, b: b, a: a });
         }
-
-        // Отрисовка исходящего диагностического витка V- в Окне 2
-        if (i % 6 === 0 || pixelData) {
-            const screenX = cxL + voxel.x * scaleL;
-            const screenY = cyL + voxel.y * scaleL - (t * 20);
-            glLocal.beginPath(); glLocal.arc(screenX, screenY, 2, 0, 2 * Math.PI);
-            glLocal.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`; glLocal.fill();
-        }
-
-        // Записываем воксель. Каждый пиксель теперь намертво связан со своим уникальным t
-        outgoingVoxelsPack.push({ x: voxel.x, y: voxel.y, z: t, u: u, v: v, r, g, b, a });
     }
 
-    // --- БЛОК Б: ДЕКОДИРОВАНИЕ И ПЛОТНАЯ СБОРКА РАСТРА КАРТИНКИ (ОКНО 4) ---
+    // --- БЛОК Б: ДЕКОДИРОВАНИЕ И ПЛОТНАЯ СБОРКА СТРОК ПРЯМОУГОЛЬНОГО КАДРА (ОКНО 4) ---
     if (lastReceivedData && lastReceivedData.length > 0) {
         const rW = reconImageCanvas.width;
         const rH = reconImageCanvas.height;
@@ -170,7 +172,7 @@ function runStreamingPipeline() {
         const pScaleY = rH / CAM_H;
 
         lastReceivedData.forEach((voxel, index) => {
-            // Отрисовка диагностической Сфирали в нижнем Окне 3
+            // Отрисовка диагностических витков в нижнем Окне 3
             if (index % 8 === 0) {
                 const scrLeftX = cxR + voxel.x * scaleR;
                 const scrLeftY = cyR + voxel.y * scaleR - (voxel.z * 20);
@@ -183,13 +185,14 @@ function runStreamingPipeline() {
                 glRemote.fillStyle = `rgba(214, 39, 40, 0.7)`; glRemote.fill();
             }
 
-            // СБОРКА ПЛОСКОГО ЭКРАНА В ОКНЕ 4
+            // ИСПРАВЛЕНО: Сборка плоского прямоугольного экрана кадра в Окне 4!
+            // Браузер расставляет пиксели строго по их сохраненным индексам u и v
             if (voxel.u !== undefined && voxel.v !== undefined) {
                 let rectX = voxel.u * pScaleX;
                 let rectY = voxel.v * pScaleY;
                 
                 glRecon.fillStyle = `rgba(${voxel.r}, ${voxel.g}, ${voxel.b}, ${voxel.a})`;
-                // Отрисовываем плотный сплошной пиксель
+                // Отрисовываем плотный сплошной квадратный пиксель
                 glRecon.fillRect(rectX, rectY, Math.ceil(pScaleX) + 1, Math.ceil(pScaleY) + 1);
             }
         });
