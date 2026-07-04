@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GIDEON // Stream Client P2P Pro</title>
+    <title>GIDEON // P2P Сфиральный Кодек Мост</title>
     <style>
         :root {
             --bg-deep: #04060a;
@@ -37,27 +37,19 @@
             background: rgba(0,0,0,0.4); border: 1px solid var(--border); padding: 12px; border-radius: 6px;
             font-family: monospace; font-size: 0.85rem;
         }
-        .id-val { color: var(--neon-cyan); font-weight: bold; font-size: 1rem; word-break: break-all; margin-top: 5px; }
         
         .section-tag {
             font-family: monospace; font-size: 0.75rem; text-transform: uppercase; color: #52648c; margin-bottom: 5px;
         }
         
-        input[type="text"] {
-            width: 100%; background: #131826; border: 1px solid var(--border); color: white;
-            padding: 10px; border-radius: 6px; box-sizing: border-box; font-family: monospace; margin-bottom: 10px;
-        }
-        input[type="text"]:focus { border-color: var(--neon-purple); outline: none; }
-        
-        button {
+        button, label.file-label {
             width: 100%; border: 1px solid var(--border); color: white; padding: 11px; border-radius: 6px;
             font-weight: bold; cursor: pointer; transition: all 0.2s; margin-bottom: 5px;
-            background: #171c3d;
+            background: #171c3d; display: block; text-align: center; box-sizing: border-box; font-size: 0.85rem;
         }
-        button:hover { border-color: var(--neon-cyan); box-shadow: 0 0 10px rgba(0,255,204,0.2); }
-        button.active {
-            border-color: var(--neon-cyan); color: var(--neon-cyan); background: rgba(0, 255, 204, 0.05);
-        }
+        button:hover, label.file-label:hover { border-color: var(--neon-cyan); box-shadow: 0 0 10px rgba(0,255,204,0.2); }
+        
+        input[type="file"] { display: none; }
         
         .projector-zone {
             flex-grow: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 20px;
@@ -73,51 +65,40 @@
             border: 1px solid var(--border); z-index: 5;
         }
         canvas { width: 100%; flex-grow: 1; display: block; }
-        
-        #localVideo { width: 100%; max-height: 100px; border-radius: 4px; display: none; margin-top: auto; }
+        #localVideo { display: none; }
         #hiddenCanvas { display: none; }
     </style>
-    
-    <!-- Встроенная автономная библиотека PeerJS для будущего внешнего P2P сигнала -->
-    <script>
-        !function(e,t){"object"==typeof exports&&"undefined"!=typeof module?t(exports):"function"==typeof define&&define.amd?define(["exports"],t):t((e=e||self).PeerJS={})}(this,function(e){"use strict";var t=function(){function e(e,t){this._events=this._events||{},this._maxListeners=this._maxListeners||void 0,this.addNode(e,t)}return e.prototype.addNode=function(e,t){return this._events[e]?("function"==typeof this._events[e]?this._events[e]=[this._events[e],t]:this._events[e].push(t),this):(this._events[e]=t,this)},e}();window.Peer=function(e,t){if(!(this instanceof Peer))return new Peer(e,t);t=t||{},this.options=Object.assign({host:"://peerjs.com",port:443,secure:!0,path:"/",debug:0},t),this.id=e||null,this._openServerConnection()};Peer.prototype._openServerConnection=function(){var e=this,t=(this.options.secure?"wss://":"ws://")+this.options.host+":"+this.options.port+this.options.path+"peerjs?key=peerjs";this._socket=new WebSocket(t),this._socket.onopen=function(){var t=e.id?{type:"OPEN",id:e.id}:{type:"OPEN"};e._socket.send(JSON.stringify(t))},this._socket.onmessage=function(t){var n=JSON.parse(t.data);if("OPEN"===n.type)e.id=n.id,e._initialize();else if("OPEN_ERROR"===n.type)e.emit("error",new Error("ID уже занят")),e._socket.close();else if(e._conn&&"DATA"===n.type)e._conn.emit("data",n.data)},this._socket.onerror=function(t){e.emit("error",t)}},Peer.prototype._initialize=function(){var e=this;setTimeout(function(){if(typeof e._onOpenReady=="function")e._onOpenReady(e.id)},50)},Peer.prototype.connect=function(e){var t=this;this._conn={_events:{},on:function(e,t){this._events[e]=t},emit:function(e,t){if(this._events[e])this._events[e](t)},send:function(e){t._socket.send(JSON.stringify({type:"DATA",dst:this.peer,data:e}))},peer:e};return setTimeout(function(){if(t._conn._events.open)t._conn._events.open()},100),this._conn},Peer.prototype.on=function(e,t){"open"===e&&(this._onOpenReady=t),"connection"===e&&(this._onConnectionReady=t)},Peer.prototype.emit=function(e,t){};e.Peer=window.Peer});
-    </script>
 </head>
 <body>
 
     <header class="header">
-        <h1>GIDEON // P2P Сфиральный Кодек Pro</h1>
-        <div id="netStatus" style="font-size: 0.8rem; font-family: monospace; color: #00ffcc;">СТАТУС: ИНИЦИАЛИЗАЦИЯ...</div>
+        <h1>GIDEON // Сфиральный Объективный Мост</h1>
+        <div id="netStatus" style="font-size: 0.8rem; font-family: monospace; color: #00ffcc;">СТАТУС: АВТОНОМНОЕ ЯДРО В СЕТИ</div>
     </header>
 
     <div class="main-grid">
         <aside class="telecom-panel">
             
-            <!-- МОДУЛЬ ПЕРЕКЛЮЧЕНИЯ РЕЖИМА СИГНАЛА -->
+            <!-- ПАНЕЛЬ ОТПРАВИТЕЛЯ (СЖАТИЕ И СОХРАНЕНИЕ) -->
             <div>
-                <div class="section-tag">Режим работы ядра</div>
-                <button id="modeLoopBtn" class="active">Режим: Самодиагностика</button>
-                <button id="modeNetBtn">Режим: Внешний P2P Сигнал</button>
+                <div class="section-tag">Выходной поток (Ваш узел)</div>
+                <button id="toggleCamBtn">Включить камеру</button>
+                <button id="btnPack" style="border-color: #bd00ff; font-weight: bold;">Запаковать Сфираль 50% (V-)</button>
             </div>
 
-            <!-- МОДУЛЬ УПРАВЛЕНИЯ СЕНСОРОМ -->
+            <!-- ПАНЕЛЬ ПОЛУЧАТЕЛЯ (ИМПОРТ И РЕГЕНЕРАЦИЯ) -->
             <div>
-                <div class="section-tag">Управление сенсором</div>
-                <button id="toggleCamBtn" style="border-color: #bd00ff;">Выключить камеру</button>
-            </div>
-
-            <div class="id-box" id="networkBlock" style="display: none;">
-                <div class="section-tag">Ваш адрес в сети (ID):</div>
-                <div id="myId" class="id-val">ОЖИДАНИЕ СЕТИ...</div>
-                <div style="margin-top: 15px;" class="section-tag">Вызов абонента</div>
-                <input type="text" id="peerIdInput" placeholder="ID собеседника...">
-                <button id="btnConnect" style="background: linear-gradient(135deg, #1b1437 0%, #3b1475 100%);">Соединить каналы</button>
+                <div class="section-tag">Входной внешний поток</div>
+                <label class="file-label" style="border-color: #00ffcc; color: #00ffcc;">
+                    Загрузить внешнюю Сфираль
+                    <input type="file" id="fileImport" accept=".json">
+                </label>
             </div>
 
             <div class="id-box" style="margin-top: auto; font-size: 0.8rem;">
-                <div style="color: var(--neon-purple); font-weight: bold;">МЕТРИКА СЖАТИЯ СФИРАЛИ:</div>
-                <div style="margin-top: 5px;">Передача по сети: <span style="color: #ff4444; font-weight: bold;">50% (V-)</span></div>
-                <div>Регенерация: <span style="color: var(--neon-cyan); font-weight: bold;">100% (V+ Антисимметрия)</span></div>
+                <div style="color: var(--neon-purple); font-weight: bold;">МЕТРИКА ОБЪЕКТИВНОГО СЖАТИЯ:</div>
+                <div style="margin-top: 5px;">Переданный файл: <span style="color: #ff4444; font-weight: bold;">Сжат на 50%</span></div>
+                <div>Регенерация: <span style="color: var(--neon-cyan); font-weight: bold;">100% (V+ на клиенте)</span></div>
             </div>
 
             <video id="localVideo" autoplay playsinline muted></video>
@@ -126,11 +107,11 @@
 
         <main class="projector-zone">
             <div class="viewport-box">
-                <div class="viewport-tag" style="color: #ff4444;">[ТРАНСЛЯЦИЯ] Входной поток V-</div>
+                <div class="viewport-tag" style="color: #ff4444;">[ОТПРАВКА] Ваш исходящий виток V-</div>
                 <canvas id="localCanvas"></canvas>
             </div>
             <div class="viewport-box">
-                <div class="viewport-tag" style="color: var(--neon-cyan);">[ПРИЕМ] Восстановленная голограмма</div>
+                <div class="viewport-tag" style="color: var(--neon-cyan);">[ПРИЕМ] Объективная регенерация внешнего сигнала</div>
                 <canvas id="remoteCanvas"></canvas>
             </div>
         </main>
