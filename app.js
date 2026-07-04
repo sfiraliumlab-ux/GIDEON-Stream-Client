@@ -1,5 +1,5 @@
 /**
- * GIDEON-Stream-Client // Сетевой координатор P2P-видеосвязи через Telegram API
+ * GIDEON-Stream-Client // Сетевой координатор через встроенное Telegram WebApp API
  */
 
 const localCanvas = document.getElementById('localCanvas');
@@ -20,13 +20,25 @@ const modeNetBtn = document.getElementById('modeNetBtn');
 const toggleCamBtn = document.getElementById('toggleCamBtn');
 const networkBlock = document.getElementById('networkBlock');
 
-const TG_TOKEN = "8632880535:AAHl_PdkJ1r5hYrR9PwzG5akGBVpUbY2my8";
 const DENSITY = 350; 
 let sTime = 0, isCamActive = false, signalMode = 'loop'; 
-let myChatId = "ОПРЕДЕЛЕНИЕ...", targetChatId = null, lastReceivedData = null, lastUpdateId = 0, tgInterval = null;
+let myChatId = "LOCAL_USER", targetChatId = null, lastReceivedData = null;
+
+// Инициализируем контекст Telegram WebApp
+let tg = null;
+if (window.Telegram && window.Telegram.WebApp) {
+    tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand(); // Разворачиваем окно на весь экран телефона
+    
+    if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+        myChatId = tg.initDataUnsafe.user.id.toString();
+    }
+}
 
 toggleCamBtn.innerText = "Включить камеру";
 toggleCamBtn.style.borderColor = "#00ffcc";
+myIdDisplay.innerText = myChatId;
 netStatus.innerText = "СТАТУС: РЕЖИМ САМОДИАГНОСТИКИ (МАТЕМАТИЧЕСКИЙ ТЕСТ)";
 
 function resizeViewports() {
@@ -42,18 +54,14 @@ modeLoopBtn.addEventListener('click', () => {
     networkBlock.style.display = 'none';
     netStatus.innerText = isCamActive ? "СТАТУС: РЕЖИМ САМОДИАГНОСТИКИ (СЕНСОР)" : "СТАТУС: РЕЖИМ САМОДИАГНОСТИКИ (МАТЕМАТИЧЕСКИЙ ТЕСТ)";
     netStatus.style.color = "#00ffcc";
-    if (tgInterval) { clearInterval(tgInterval); tgInterval = null; }
 });
 
 modeNetBtn.addEventListener('click', () => {
     signalMode = 'network';
     modeNetBtn.classList.add('active'); modeLoopBtn.classList.remove('active');
     networkBlock.style.display = 'block';
-    netStatus.innerText = "СТАТУС: СВЯЗЬ С СЕРВЕРАМИ TELEGRAM..."; netStatus.style.color = "#bd00ff";
-    myIdDisplay.innerText = "ОЖИДАНИЕ СИГНАЛА...";
-    netStatus.innerText = "СТАТУС: ОТПРАВЬТЕ ЛЮБОЕ СООБЩЕНИЕ СВОЕМУ БОТУ В TG";
-    if (tgInterval) clearInterval(tgInterval);
-    tgInterval = setInterval(fetchTelegramUpdates, 1000);
+    netStatus.innerText = "СТАТУС: TELEGRAM WEBAPP СВЯЗЬ АКТИВНА"; 
+    netStatus.style.color = "#bd00ff";
 });
 
 toggleCamBtn.addEventListener('click', () => {
@@ -68,44 +76,26 @@ toggleCamBtn.addEventListener('click', () => {
     }
 });
 
-async function sendSfiralDataViaTG(voxelsPack) {
-    if (!targetChatId) return;
-    const payload = { type: "gideon_v-", from: myChatId, v: voxelsPack.map(pt => [Math.round(pt.x*100), Math.round(pt.y*100), Math.round(pt.z*100), pt.r, pt.g, pt.b]) };
-    try { await fetch(`https://telegram.org{TG_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: targetChatId, text: `GIDEON_STREAM:${JSON.stringify(payload)}`, disable_notification: true }) }); } catch (e) {}
-}
+// Отправка вокселей через встроенную шину данных Telegram WebApp
+function sendSfiralDataViaTG(voxelsPack) {
+    if (!tg) return;
+    
+    const payload = {
+        type: "gideon_v-",
+        from: myChatId,
+        v: voxelsPack.map(pt => [Math.round(pt.x*100), Math.round(pt.y*100), Math.round(pt.z*100), pt.r, pt.g, pt.b])
+    };
 
-async function fetchTelegramUpdates() {
-    try {
-        const res = await fetch(`https://telegram.org{TG_TOKEN}/getUpdates?offset=${lastUpdateId + 1}&limit=10`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.ok && data.result.length > 0) {
-            data.result.forEach(update => {
-                lastUpdateId = update.update_id;
-                if (update.message && update.message.chat) {
-                    const incomingChatId = update.message.chat.id.toString();
-                    if (["ОПРЕДЕЛЕНИЕ...", "LOCAL_USER", "ОЖИДАНИЕ СИГНАЛА..."].includes(myChatId)) {
-                        myChatId = incomingChatId; myIdDisplay.innerText = myChatId;
-                        netStatus.innerText = "СТАТУС: ВНЕШНИЙ КАНАЛ СВЯЗИ TG ГОТОВ"; netStatus.style.color = "#00ffcc";
-                    }
-                    if (update.message.text && update.message.text.startsWith("GIDEON_STREAM:")) {
-                        try {
-                            const parsed = JSON.parse(update.message.text.replace("GIDEON_STREAM:", ""));
-                            if (parsed.type === "gideon_v-" && parsed.from !== myChatId) {
-                                lastReceivedData = parsed.v.map(arr => ({ x: arr[0]/100, y: arr[1]/100, z: arr[2]/100, r: arr[3], g: arr[4], b: arr[5], a: 0.9 }));
-                            }
-                        } catch(err) {}
-                    }
-                }
-            });
-        }
-    } catch(e) {}
+    // Передаем данные обратно в чат бота абсолютно легально и без блокировок CORS
+    tg.sendData(JSON.stringify(payload));
 }
 
 btnConnect.addEventListener('click', () => {
     const inputVal = peerIdInput.value.trim();
-    if (!inputVal) return alert("Введите Chat ID абонента");
-    targetChatId = inputVal; netStatus.innerText = `СТАТУС: СТРИМИНГ НА УЗЕЛ TELEGRAM [${targetChatId}]`; netStatus.style.color = "#bd00ff";
+    if (!inputVal) return alert("Введите ID абонента");
+    targetChatId = inputVal; 
+    netStatus.innerText = `СТАТУС: ПЕРЕДАЧА ДАННЫХ В ЧАТ TELEGRAM`; 
+    netStatus.style.color = "#bd00ff";
 });
 
 let frameThrottle = 0;
@@ -145,8 +135,12 @@ function runStreamingPipeline() {
 
     if (signalMode === 'loop') {
         lastReceivedData = outgoingVoxelsPack;
-    } else if (signalMode === 'network' && targetChatId && outgoingVoxelsPack.length > 0) {
-        frameThrottle++; if (frameThrottle >= 25) { sendSfiralDataViaTG(outgoingVoxelsPack); frameThrottle = 0; }
+    } else if (signalMode === 'network' && outgoingVoxelsPack.length > 0) {
+        frameThrottle++; 
+        if (frameThrottle >= 60) { // Отправляем пакет при фиксации кадра кнопкой
+            sendSfiralDataViaTG(outgoingVoxelsPack); 
+            frameThrottle = 0; 
+        }
     }
 
     if (lastReceivedData && lastReceivedData.length > 0) {
