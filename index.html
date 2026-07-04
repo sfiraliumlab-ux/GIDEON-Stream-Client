@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GIDEON // P2P Сфиральный Кодек Мост</title>
+    <title>GIDEON // Сфиральный Голографический Кодек</title>
     <style>
         :root {
             --bg-deep: #04060a;
@@ -15,32 +15,28 @@
         }
         body {
             margin: 0; padding: 0;
-            background-color: var(--bg-deep);
-            color: var(--text);
+            background-color: var(--bg-deep); color: var(--text);
             font-family: system-ui, -apple-system, sans-serif;
             display: flex; flex-direction: column; height: 100vh; overflow: hidden;
         }
         .header {
             height: 55px; background: var(--panel-bg); border-bottom: 1px solid var(--border);
-            display: flex; justify-content: space-between; align-items: center; padding: 0 20px;
-            box-sizing: border-box;
+            display: flex; justify-content: space-between; align-items: center; padding: 0 20px; box-sizing: border-box;
         }
         .header h1 { font-size: 1rem; letter-spacing: 1px; text-transform: uppercase; margin: 0; color: var(--neon-cyan); }
         
         .main-grid { display: flex; flex-grow: 1; height: calc(100vh - 55px); }
         
+        /* Боковая панель */
         .telecom-panel {
-            width: 320px; background: var(--panel-bg); border-right: 1px solid var(--border);
+            width: 300px; background: var(--panel-bg); border-right: 1px solid var(--border);
             padding: 20px; display: flex; flex-direction: column; gap: 15px; box-sizing: border-box;
         }
         .id-box {
             background: rgba(0,0,0,0.4); border: 1px solid var(--border); padding: 12px; border-radius: 6px;
             font-family: monospace; font-size: 0.85rem;
         }
-        
-        .section-tag {
-            font-family: monospace; font-size: 0.75rem; text-transform: uppercase; color: #52648c; margin-bottom: 5px;
-        }
+        .section-tag { font-family: monospace; font-size: 0.75rem; text-transform: uppercase; color: #52648c; margin-bottom: 5px; }
         
         button, label.file-label {
             width: 100%; border: 1px solid var(--border); color: white; padding: 11px; border-radius: 6px;
@@ -48,70 +44,86 @@
             background: #171c3d; display: block; text-align: center; box-sizing: border-box; font-size: 0.85rem;
         }
         button:hover, label.file-label:hover { border-color: var(--neon-cyan); box-shadow: 0 0 10px rgba(0,255,204,0.2); }
-        
         input[type="file"] { display: none; }
         
+        /* ЧЕТЫРЕХОКОННАЯ СРЕДА РЕНДЕРЕРА */
         .projector-zone {
-            flex-grow: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 20px;
+            flex-grow: 1; display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 120px; /* Большие окна сверху, маленькие снизу */
+            gap: 15px; padding: 20px; box-sizing: border-box;
             background: radial-gradient(circle at center, #0b1124 0%, #03050a 100%);
         }
         .viewport-box {
-            position: relative; background: rgba(4, 6, 10, 0.7); border: 1px solid var(--border);
+            position: relative; background: rgba(4, 6, 10, 0.8); border: 1px solid var(--border);
             border-radius: 8px; overflow: hidden; display: flex; flex-direction: column;
         }
         .viewport-tag {
-            position: absolute; top: 15px; left: 15px; background: rgba(11,14,23,0.8);
-            padding: 5px 10px; border-radius: 4px; font-size: 0.75rem; font-family: monospace;
-            border: 1px solid var(--border); z-index: 5;
+            position: absolute; top: 10px; left: 10px; background: rgba(11,14,23,0.9);
+            padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-family: monospace;
+            border: 1px solid var(--border); z-index: 5; letter-spacing: 0.5px;
         }
-        canvas { width: 100%; flex-grow: 1; display: block; }
-        #localVideo { display: none; }
+        
+        /* Стилизация окон вывода */
+        #localVideo { width: 100%; height: 100%; object-fit: cover; background: #000; }
+        canvas { width: 100%; height: 100%; display: block; }
         #hiddenCanvas { display: none; }
     </style>
 </head>
 <body>
 
     <header class="header">
-        <h1>GIDEON // Сфиральный Объективный Мост</h1>
-        <div id="netStatus" style="font-size: 0.8rem; font-family: monospace; color: #00ffcc;">СТАТУС: АВТОНОМНОЕ ЯДРО В СЕТИ</div>
+        <h1>GIDEON // Визуальный Двухсторонний Кодек</h1>
+        <div id="netStatus" style="font-size: 0.8rem; font-family: monospace; color: #00ffcc;">СТАТУС: МОДУЛЬ ОЦЕНКИ И РЕГЕНЕРАЦИИ КАДРОВ</div>
     </header>
 
     <div class="main-grid">
         <aside class="telecom-panel">
-            
-            <!-- ПАНЕЛЬ ОТПРАВИТЕЛЯ (СЖАТИЕ И СОХРАНЕНИЕ) -->
             <div>
-                <div class="section-tag">Выходной поток (Ваш узел)</div>
+                <div class="section-tag">Выходной канал (Отправка)</div>
                 <button id="toggleCamBtn">Включить камеру</button>
-                <button id="btnPack" style="border-color: #bd00ff; font-weight: bold;">Запаковать Сфираль 50% (V-)</button>
+                <button id="btnPack" style="border-color: #bd00ff; font-weight: bold;">Запаковать в Сфираль 50%</button>
             </div>
 
-            <!-- ПАНЕЛЬ ПОЛУЧАТЕЛЯ (ИМПОРТ И РЕГЕНЕРАЦИЯ) -->
             <div>
-                <div class="section-tag">Входной внешний поток</div>
+                <div class="section-tag">Входной канал (Прием)</div>
                 <label class="file-label" style="border-color: #00ffcc; color: #00ffcc;">
-                    Загрузить внешнюю Сфираль
+                    Импортировать Сфираль
                     <input type="file" id="fileImport" accept=".json">
                 </label>
             </div>
 
             <div class="id-box" style="margin-top: auto; font-size: 0.8rem;">
-                <div style="color: var(--neon-purple); font-weight: bold;">МЕТРИКА ОБЪЕКТИВНОГО СЖАТИЯ:</div>
-                <div style="margin-top: 5px;">Переданный файл: <span style="color: #ff4444; font-weight: bold;">Сжат на 50%</span></div>
-                <div>Регенерация: <span style="color: var(--neon-cyan); font-weight: bold;">100% (V+ на клиенте)</span></div>
+                <div style="color: var(--neon-purple); font-weight: bold;">ОБЪЕКТИВНЫЙ РЕЗУЛЬТАТ:</div>
+                <div style="margin-top: 5px;">Размер в сети: <span style="color: #ff4444; font-weight: bold;">Сжато на 50%</span></div>
+                <div>Регенерация: <span style="color: var(--neon-cyan); font-weight: bold;">100% матрицы</span></div>
             </div>
-
-            <video id="localVideo" autoplay playsinline muted></video>
             <canvas id="hiddenCanvas" width="80" height="60"></canvas>
         </aside>
 
+        <!-- ЧЕТЫРЕ РАБОЧИХ ОКНА ДЛЯ ПОЛЬЗОВАТЕЛЯ -->
         <main class="projector-zone">
+            <!-- ОКНО 1: Прямое видео пользователя (БОЛЬШОЕ ЛЕВОЕ СВЕРХУ) -->
             <div class="viewport-box">
-                <div class="viewport-tag" style="color: #ff4444;">[ОТПРАВКА] Ваш исходящий виток V-</div>
+                <div class="viewport-tag" style="color: #ffffff;">[ОКНО 1] Исходное видео с веб-камеры (Сенсор)</div>
+                <video id="localVideo" autoplay playsinline muted></video>
+            </div>
+            
+            <!-- ОКНО 4: Реконструированная плоская картинка (БОЛЬШОЕ ПРАВОЕ СВЕРХУ) -->
+            <div class="viewport-box">
+                <div class="viewport-tag" style="color: var(--neon-cyan);">[ОКНО 4] ОБЪЕКТИВНЫЙ РЕЗУЛЬТАТ: Восстановленный кадр из Сфирали</div>
+                <canvas id="reconstructedImageCanvas"></canvas>
+            </div>
+
+            <!-- ОКНО 2: Форма исходящей Сфирали (МАЛЕНЬКОЕ ЛЕВОЕ СНИЗУ) -->
+            <div class="viewport-box">
+                <div class="viewport-tag" style="color: #ff4444;">[ОКНО 2] Матрица сжатия V- (50% данных)</div>
                 <canvas id="localCanvas"></canvas>
             </div>
+
+            <!-- ОКНО 3: Форма регенерированной Сфирали (МАЛЕНЬКОЕ ПРАВОЕ СНИЗУ) -->
             <div class="viewport-box">
-                <div class="viewport-tag" style="color: var(--neon-cyan);">[ПРИЕМ] Объективная регенерация внешнего сигнала</div>
+                <div class="viewport-tag" style="color: var(--neon-purple);">[ОКНО 3] Матрица регенерации V+ (100% объем)</div>
                 <canvas id="remoteCanvas"></canvas>
             </div>
         </main>
