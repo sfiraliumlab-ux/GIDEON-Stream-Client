@@ -1,5 +1,5 @@
 /**
- * GIDEON-Stream-Client // Сетевой кодек с плотным растровым сфиральным кодированием
+ * GIDEON-Stream-Client // Полный автономный сфиральный кодек (Честная асимметричная развертка)
  */
 
 const localCanvas = document.getElementById('localCanvas');
@@ -18,7 +18,7 @@ const btnPack = document.getElementById('btnPack');
 const fileImport = document.getElementById('fileImport');
 const netStatus = document.getElementById('netStatus');
 
-// Конфигурация плотности матрицы сенсора
+// Конфигурация плотности растровой матрицы
 const CAM_W = 80;
 const CAM_H = 60;
 let sTime = 0;
@@ -27,6 +27,7 @@ let isCamActive = false;
 let outgoingVoxelsPack = []; 
 let lastReceivedData = null;  
 
+// Константы оригинальной Сфирали автора
 const R_COIL = 1.8;
 const HEIGHT_COIL = 1.2;
 const HEIGHT_S = 0.4;
@@ -40,7 +41,7 @@ function resizeViewports() {
 window.addEventListener('resize', resizeViewports);
 resizeViewports();
 
-// Управление веб-камерой
+// Осознанное управление веб-камерой пользователем
 toggleCamBtn.addEventListener('click', () => {
     isCamActive = !isCamActive;
     if (isCamActive) {
@@ -55,18 +56,18 @@ toggleCamBtn.addEventListener('click', () => {
     }
 });
 
-// Кнопка запаковки
+// Кнопка запаковки полной матрицы в файл
 btnPack.addEventListener('click', () => {
-    if (outgoingVoxelsPack.length === 0) return alert("Конвейер пуст. Включите камеру.");
+    if (outgoingVoxelsPack.length === 0) return alert("Конвейер пуст. Включите камеру для захвата.");
     const blob = new Blob([JSON.stringify(outgoingVoxelsPack)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url;
-    a.download = `gideon_dense_matrix_${Date.now()}.json`;
+    a.download = `gideon_asymmetric_matrix_${Date.now()}.json`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-    netStatus.innerText = "СТАТУС: ПЛОТНАЯ МАТРИЦА СФИРАЛИ УСПЕШНО СОХРАНЕНА"; netStatus.style.color = "#bd00ff";
+    netStatus.innerText = "СТАТУС: АСИММЕТРИЧНАЯ МАТРИЦА СФИРАЛИ УСПЕШНО СОХРАНЕНА"; netStatus.style.color = "#bd00ff";
 });
 
-// Операция импорта файла
+// Операция объективного импорта внешнего файла
 fileImport.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -74,9 +75,9 @@ fileImport.addEventListener('change', (e) => {
     reader.onload = (event) => {
         try {
             lastReceivedData = JSON.parse(event.target.result);
-            netStatus.innerText = "СТАТУС: ВНЕШНИЙ СИГНАЛ ПРИНЯТ. РЕГЕНЕРАЦИЯ ПОЛНОГО КАДРА ВЫПОЛНЕНА";
+            netStatus.innerText = "СТАТУС: ВНЕШНИЙ СИГНАЛ ПРИНЯТ. РЕГЕНЕРАЦИЯ КАДРА ВЫПОЛНЕНА";
             netStatus.style.color = "#00ffcc";
-        } catch(err) { alert("Ошибка файла Сфирали"); }
+        } catch(err) { alert("Ошибка чтения файла Сфирали"); }
     };
     reader.readAsText(file);
 });
@@ -104,14 +105,14 @@ function getLeftStreamPoint(t, phase) {
     // Антисимметрия для левой стороны (V-)
     x = -x; y = -y; z = -z;
 
-    // Вращение для диагностических нижних окон
+    // Авто-вращение для диагностических нижних окон
     const rotatedX = x * Math.cos(phase) - y * Math.sin(phase);
     const rotatedY = x * Math.sin(phase) + y * Math.cos(phase);
 
     return { x: rotatedX, y: rotatedY, zOffset: z, rawX: x, rawY: y };
 }
 
-// --- ГЛАВНЫЙ ВЫЧИСЛИТЕЛЬНЫЙ КОНВЕЙЕР ---
+// --- ГЛАВНЫЙ ВЫЧИСЛИТЕЛЬНЫЙ И РЕКОНСТРУКЦИОННЫЙ КОНВЕЙЕР ---
 function runStreamingPipeline() {
     glLocal.clearRect(0, 0, localCanvas.width, localCanvas.height);
     glRemote.clearRect(0, 0, remoteCanvas.width, remoteCanvas.height);
@@ -133,18 +134,20 @@ function runStreamingPipeline() {
     outgoingVoxelsPack = [];
     let counter = 0;
 
-    // --- БЛОК А: СКАНИРОВАНИЕ ВСЕГО ПРЯМОУГОЛЬНОГО КАДРА (ПО СТРОКАМ И СТОЛБЦАМ) ---
+    // --- БЛОК А: СКАНИРОВАНИЕ ВСЕГО ПРЯМОУГОЛЬНОГО КАДРА (ЧЕСТНАЯ АСИММЕТРИЯ) ---
+    // Пробегаем по абсолютно всей площади кадра (u от 0 до 80, v от 0 до 60)
+    // Сканирующий луч Сфирали поочередно вбирает в себя ВСЕ объекты: и слева, и справа
     for (let v = 0; v < CAM_H; v++) {
-        for (let u = 0; u < CAM_W / 2; u++) {
+        for (let u = 0; u < CAM_W; u++) {
             counter++;
             
-            // Переводим плоские координаты пикселя (u, v) в сфиральный параметр t от -1.0 до 0.0
-            let t = (v / (CAM_H - 1)) * 0.5 + (u / (CAM_W / 2 - 1)) * 0.5 - 1.0;
+            // Нормализуем плоские координаты растра (u, v) в сквозной сфиральный параметр t от -1.0 до 0.0
+            let t = (v / (CAM_H - 1)) * 0.5 + (u / (CAM_W - 1)) * 0.5 - 1.0;
             t = Math.max(-1.0, Math.min(0.0, t));
 
             const voxel = getLeftStreamPoint(t, sTime);
 
-            let r = 31, g = 119, b = 180, a = 0.2; // Дефолтный синий каркас, если камера спит
+            let r = 31, g = 119, b = 180, a = 0.2; // Дефолтный синий каркас
 
             if (pixelData) {
                 const idx = (v * CAM_W + u) * 4;
@@ -155,19 +158,19 @@ function runStreamingPipeline() {
             }
 
             // Отрисовываем левый виток в диагностическом Окне 2 (снизу)
-            if (counter % 3 === 0 || pixelData) {
+            if (counter % 6 === 0 || pixelData) {
                 const screenX = cxL + voxel.x * scaleL;
                 const screenY = cyL + voxel.y * scaleL - (t * 20);
                 glLocal.beginPath(); glLocal.arc(screenX, screenY, 2, 0, 2 * Math.PI);
                 glLocal.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`; glLocal.fill();
             }
 
-            // ЗАПИСЫВАЕМ ПОЛНЫЙ ПАКЕТ
+            // ЗАПИСЫВАЕМ ПОЛНЫЙ ПАКЕТ: Сохраняем реальные, неискаженные пиксели мира
             outgoingVoxelsPack.push({ x: voxel.x, y: voxel.y, z: t, u: u, v: v, r, g, b, a });
         }
     }
 
-    // --- БЛОК Б: ДЕКОДИРОВАНИЕ И РАЗВЕРТКА ПОЛНОГО ПЛОСКОГО ЭКРАНА (ОКНО 4) ---
+    // --- БЛОК Б: ДЕКОДИРОВАНИЕ И ЧЕСТНАЯ АСИММЕТРИЧНАЯ РАЗВЕРТКА КАДРА (ОКНО 4) ---
     if (lastReceivedData && lastReceivedData.length > 0) {
         const rW = reconImageCanvas.width;
         const rH = reconImageCanvas.height;
@@ -176,7 +179,7 @@ function runStreamingPipeline() {
 
         lastReceivedData.forEach((voxel, index) => {
             // Отрисовка диагностической Сфирали в нижнем Окне 3
-            if (index % 4 === 0) {
+            if (index % 8 === 0) {
                 const scrLeftX = cxR + voxel.x * scaleR;
                 const scrLeftY = cyR + voxel.y * scaleR - (voxel.z * 20);
                 glRemote.beginPath(); glRemote.arc(scrLeftX, scrLeftY, 2, 0, 2 * Math.PI);
@@ -188,20 +191,14 @@ function runStreamingPipeline() {
                 glRemote.fillStyle = `rgba(214, 39, 40, 0.7)`; glRemote.fill();
             }
 
-            // РАЗВЕРТКА ПОЛНОЙ ПРЯМОУГОЛЬНОЙ КАРТИНКИ В ОКНЕ 4
+            // РАЗВЕРТКА ПОЛНОЙ АСИММЕТРИЧНОЙ КАРТИНКИ В ОКНЕ 4
+            // Никакого искусственного отзеркаливания. Пиксели ложатся строго на свои оригинальные адреса
             if (voxel.u !== undefined && voxel.v !== undefined) {
-                // Левая половина лица (Восстановленная из вшитых пикселей файла)
                 let rectX = voxel.u * pScaleX;
                 let rectY = voxel.v * pScaleY;
-                glRecon.fillStyle = `rgba(${voxel.r}, ${voxel.g}, ${voxel.b}, ${voxel.a})`;
-                glRecon.fillRect(rectX, rectY, Math.ceil(pScaleX) + 1, Math.ceil(pScaleY) + 1);
-
-                // ОБЪЕКТИВНАЯ РЕГЕНЕРАЦИЯ ПРАВОЙ СТОРОНЫ ЛИЦА
-                let rectRightX = (parseFloat(CAM_W) - 1 - voxel.u) * pScaleX;
-                let rectRightY = voxel.v * pScaleY; 
                 
                 glRecon.fillStyle = `rgba(${voxel.r}, ${voxel.g}, ${voxel.b}, ${voxel.a})`;
-                glRecon.fillRect(rectRightX, rectRightY, Math.ceil(pScaleX) + 1, Math.ceil(pScaleY) + 1);
+                glRecon.fillRect(rectX, rectY, Math.ceil(pScaleX) + 1, Math.ceil(pScaleY) + 1);
             }
         });
     }
