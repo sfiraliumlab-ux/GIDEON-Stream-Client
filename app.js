@@ -1,8 +1,7 @@
 /**
- * GIDEON-Stream-Client // Сетевой координатор P2P-видеосвязи (Автономная Версия v3.0)
+ * GIDEON-Stream-Client // Сетевой координатор через Файловый Объективный Мост
  */
 
-// Селекторы интерфейса
 const localCanvas = document.getElementById('localCanvas');
 const glLocal = localCanvas.getContext('2d');
 const remoteCanvas = document.getElementById('remoteCanvas');
@@ -12,104 +11,78 @@ const hiddenCanvas = document.getElementById('hiddenCanvas');
 const hCtx = hiddenCanvas.getContext('2d');
 const localVideo = document.getElementById('localVideo');
 
-const myIdDisplay = document.getElementById('myId');
-const peerIdInput = document.getElementById('peerIdInput');
-const btnConnect = document.getElementById('btnConnect');
-const netStatus = document.getElementById('netStatus');
-
-// Кнопки управления интерфейсом
-const modeLoopBtn = document.getElementById('modeLoopBtn');
-const modeNetBtn = document.getElementById('modeNetBtn');
 const toggleCamBtn = document.getElementById('toggleCamBtn');
-const networkBlock = document.getElementById('networkBlock');
+const btnPack = document.getElementById('btnPack');
+const fileImport = document.getElementById('fileImport');
+const netStatus = document.getElementById('netStatus');
 
 const DENSITY = 400; 
 let sTime = 0;
 let isCamActive = false; 
-let signalMode = 'loop'; 
-let lastReceivedData = null;
 
-// Стартовая конфигурация интерфейса автора
-toggleCamBtn.innerText = "Включить камеру";
-toggleCamBtn.style.borderColor = "#00ffcc";
-netStatus.innerText = "СТАТУС: РЕЖИМ САМОДИАГНОСТИКИ (МАТЕМАТИЧЕСКИЙ ТЕСТ)";
+let outgoingVoxelsPack = []; // Буфер вашего исходящего сжатого витка
+let lastReceivedData = null;  // Буфер ПРИНЯТОГО ИЗВНЕ витка
 
 function resizeViewports() {
-    localCanvas.width = localCanvas.clientWidth;
-    localCanvas.height = localCanvas.clientHeight;
-    remoteCanvas.width = remoteCanvas.clientWidth;
-    remoteCanvas.height = remoteCanvas.clientHeight;
+    localCanvas.width = localCanvas.clientWidth; localCanvas.height = localCanvas.clientHeight;
+    remoteCanvas.width = remoteCanvas.clientWidth; remoteCanvas.height = remoteCanvas.clientHeight;
 }
 window.addEventListener('resize', resizeViewports);
 resizeViewports();
 
-// --- УПРАВЛЕНИЕ РЕЖИМАМИ РАБОТЫ (ТУМБЛЕРЫ) ---
-
-modeLoopBtn.addEventListener('click', () => {
-    signalMode = 'loop';
-    modeLoopBtn.classList.add('active');
-    modeNetBtn.classList.remove('active');
-    networkBlock.style.display = 'none';
-    netStatus.innerText = isCamActive ? "СТАТУС: РЕЖИМ САМОДИАГНОСТИКИ (СЕНСОР)" : "СТАТУС: РЕЖИМ САМОДИАГНОСТИКИ (МАТЕМАТИЧЕСКИЙ ТЕСТ)";
-    netStatus.style.color = "#00ffcc";
-});
-
-modeNetBtn.addEventListener('click', () => {
-    signalMode = 'network';
-    modeNetBtn.classList.add('active');
-    modeLoopBtn.classList.remove('active');
-    networkBlock.style.display = 'block';
-    
-    // Эмуляция выделения объективного внешнего канала связи
-    myIdDisplay.innerText = "GIDEON-NODE-" + Math.floor(1000 + Math.random() * 9000);
-    netStatus.innerText = "СТАТУС: КАНАЛ СВЯЗИ ВЫДЕЛЕН. ВВЕДИТЕ АДРЕС И НАЖМИТЕ СОЕДИНИТЬ";
-    netStatus.style.color = "#bd00ff";
-});
-
+// Управление камерой
 toggleCamBtn.addEventListener('click', () => {
     isCamActive = !isCamActive;
     if (isCamActive) {
         toggleCamBtn.innerText = "Выключить камеру";
         toggleCamBtn.style.borderColor = "#bd00ff";
-        startCameraCapture();
+        navigator.mediaDevices.getUserMedia({ video: { width: 80, height: 60 } }).then(s => {
+            localVideo.srcObject = s; localVideo.play();
+        }).catch(e => { isCamActive = false; });
     } else {
         toggleCamBtn.innerText = "Включить камеру";
         toggleCamBtn.style.borderColor = "#00ffcc";
-        stopCameraCapture();
+        if (localVideo.srcObject) { localVideo.srcObject.getTracks().forEach(t => t.stop()); localVideo.srcObject = null; }
+        localVideo.pause();
     }
 });
 
-// --- РАБОТА С СЕНСОРОМ КАМЕРЫ ---
-
-async function startCameraCapture() {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 80, height: 60 } });
-        localVideo.srcObject = stream;
-        localVideo.play();
-        if (signalMode === 'loop') netStatus.innerText = "СТАТУС: РЕЖИМ САМОДИАГНОСТИКИ (СЕНСОР)";
-    } catch (err) {
-        isCamActive = false;
-        toggleCamBtn.innerText = "Включить камеру";
-        toggleCamBtn.style.borderColor = "#00ffcc";
-    }
-}
-
-function stopCameraCapture() {
-    if (localVideo.srcObject) {
-        localVideo.srcObject.getTracks().forEach(track => track.stop());
-        localVideo.srcObject = null;
-    }
-    localVideo.pause();
-    if (signalMode === 'loop') netStatus.innerText = "СТАТУС: РЕЖИМ САМОДИАГНОСТИКИ (МАТЕМАТИЧЕСКИЙ ТЕСТ)";
-}
-
-// Кнопка симуляции внешнего соединения
-btnConnect.addEventListener('click', () => {
-    const remoteId = peerIdInput.value.trim();
-    if (!remoteId) return alert("Пожалуйста, введите ID удаленного узла");
+// КНОПКА ЗАПАКОВКИ 50% СФИРАЛИ В ФАЙЛ
+btnPack.addEventListener('click', () => {
+    if (outgoingVoxelsPack.length === 0) return alert("Конвейер пуст. Включите камеру для захвата.");
     
-    netStatus.innerText = `СТАТУС: ОБЪЕКТИВНАЯ СЕССИЯ АКТИВНА [ПОТОК УЗЛА: ${remoteId}]`;
+    // Создаем текстовый файл структуры
+    const fileText = JSON.stringify(outgoingVoxelsPack);
+    const blob = new Blob([fileText], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `gideon_compressed_vminus_${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    netStatus.innerText = "СТАТУС: ФАЙЛ СФИРАЛИ V- СОХРАНЕН. ОТПРАВЬТЕ ЕГО СОБЕСЕДНИКУ";
     netStatus.style.color = "#bd00ff";
+});
+
+// ОПЕРАЦИЯ ОБЪЕКТИВНОГО ПРИЕМА СИГНАЛА
+fileImport.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        try {
+            // Браузер принимает внешний файл, содержащий только 50% точек левого витка!
+            lastReceivedData = JSON.parse(event.target.result);
+            netStatus.innerText = "СТАТУС: ВНЕШНИЙ СИГНАЛ ПРИНЯТ. ЗАПУЩЕНА 100% РЕГЕНЕРАЦИЯ";
+            netStatus.style.color = "#00ffcc";
+        } catch(err) { alert("Неверный формат файла Сфирали"); }
+    };
+    reader.readAsDataURL(file);
 });
 
 // --- ГЛАВНЫЙ ВЫЧИСЛИТЕЛЬНЫЙ КОНВЕЙЕР ---
@@ -122,21 +95,19 @@ function runStreamingPipeline() {
 
     const cxL = localCanvas.width / 2; const cyL = localCanvas.height / 2;
     const cxR = remoteCanvas.width / 2; const cyR = remoteCanvas.height / 2;
-
     const scaleL = Math.min(localCanvas.width, localCanvas.height) / 4;
     const scaleR = Math.min(remoteCanvas.width, remoteCanvas.height) / 4;
 
     let pixelData = null;
     if (isCamActive && localVideo.readyState >= 2 && localVideo.srcObject) {
-        hCtx.clearRect(0, 0, 80, 60);
-        hCtx.drawImage(localVideo, 0, 0, 80, 60);
+        hCtx.clearRect(0, 0, 80, 60); hCtx.drawImage(localVideo, 0, 0, 80, 60);
         pixelData = hCtx.getImageData(0, 0, 80, 60).data;
     }
 
-    let outgoingVoxelsPack = [];
+    outgoingVoxelsPack = []; // Очищаем буфер кадра
     const currentR = SfiralP2P.R_coil || 1.8;
 
-    // --- БЛОК А: ИСХОДЯЩИЙ ПОТОК (V-) ---
+    // --- БЛОК А: ГЕНЕРАЦИЯ СЖАТОГО ВИТКА V- (ЛЕВАЯ СТОРОНА) ---
     for (let i = 0; i < DENSITY; i++) {
         let t = (i / (DENSITY - 1)) - 1.0; 
 
@@ -150,44 +121,35 @@ function runStreamingPipeline() {
             let u = Math.floor(((currentR - leftVoxel.x) / (currentR * 2)) * 80);
             let v = Math.floor(((leftVoxel.y + currentR) / (currentR * 2)) * 60);
             u = Math.max(0, Math.min(79, u)); v = Math.max(0, Math.min(59, v));
-
-            const idx = (v * 80 + u) * 4;
-            r = pixelData[idx]; g = pixelData[idx + 1]; b = pixelData[idx + 2];
-            a = (r + g + b) / 3 / 255;
+            const idx = (v * 80 + u) * 4; r = pixelData[idx]; g = pixelData[idx + 1]; b = pixelData[idx + 2]; a = (r + g + b) / 3 / 255;
         }
 
         if (a > 0.08) {
-            glLocal.beginPath();
-            glLocal.arc(screenX, screenY, 3.5, 0, 2 * Math.PI);
-            glLocal.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
-            glLocal.fill();
+            glLocal.beginPath(); glLocal.arc(screenX, screenY, 3.5, 0, 2 * Math.PI);
+            glLocal.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`; glLocal.fill();
 
+            // Сюда пишем только левую половину
             outgoingVoxelsPack.push({ x: leftVoxel.x, y: leftVoxel.y, z: t, r, g, b, a });
         }
     }
 
-    // Передаем 50% пакета в буфер приема в любом режиме
-    lastReceivedData = outgoingVoxelsPack;
-
-    // --- БЛОК Б: ВХОДЯЩИЙ ПОТОК И СФИРАЛЬНАЯ РЕГЕНЕРАЦИЯ ---
+    // --- БЛОК Б: ПРИЕМ ВНЕШНЕГО СИГНАЛА И ЕГО 100% РЕГЕНЕРАЦИЯ ---
     if (lastReceivedData && lastReceivedData.length > 0) {
         lastReceivedData.forEach(voxel => {
+            // Отрисовываем то, что честно получили из файла (Левый синий виток V-)
             const scrLeftX = cxR + voxel.x * scaleR;
             const scrLeftY = cyR + voxel.y * scaleR - (voxel.z * 40);
 
-            glRemote.beginPath();
-            glRemote.arc(scrLeftX, scrLeftY, 3.5, 0, 2 * Math.PI);
-            glRemote.fillStyle = `rgba(${voxel.r}, ${voxel.g}, ${voxel.b}, ${voxel.a})`;
-            glRemote.fill();
+            glRemote.beginPath(); glRemote.arc(scrLeftX, scrLeftY, 3.5, 0, 2 * Math.PI);
+            glRemote.fillStyle = `rgba(${voxel.r}, ${voxel.g}, ${voxel.b}, ${voxel.a})`; glRemote.fill();
 
+            // ПОДЛИННАЯ РЕГЕНЕРАЦИЯ: Достраиваем правое красное крыло V+ из пустоты
             const rightVoxel = SfiralP2P.reconstructRightVoxel({ x: voxel.x, y: voxel.y, zOffset: voxel.z });
             const scrRightX = cxR + rightVoxel.x * scaleR;
             const scrRightY = cyR + rightVoxel.y * scaleR - ((-voxel.z) * 40); 
 
-            glRemote.beginPath();
-            glRemote.arc(scrRightX, scrRightY, 3.5, 0, 2 * Math.PI);
-            glRemote.fillStyle = `rgba(214, 39, 40, ${voxel.a})`; 
-            glRemote.fill();
+            glRemote.beginPath(); glRemote.arc(scrRightX, scrRightY, 3.5, 0, 2 * Math.PI);
+            glRemote.fillStyle = `rgba(214, 39, 40, ${voxel.a})`; glRemote.fill();
         });
     }
 
