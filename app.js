@@ -1,5 +1,5 @@
 /**
- * GIDEON-Stream-Client // Сетевой координатор через встроенное Telegram WebApp API
+ * GIDEON-Stream-Client // Сетевой координатор P2P-видеосвязи (Финальная P2P версия)
  */
 
 const localCanvas = document.getElementById('localCanvas');
@@ -20,25 +20,13 @@ const modeNetBtn = document.getElementById('modeNetBtn');
 const toggleCamBtn = document.getElementById('toggleCamBtn');
 const networkBlock = document.getElementById('networkBlock');
 
-const DENSITY = 350; 
+const DENSITY = 400; 
 let sTime = 0, isCamActive = false, signalMode = 'loop'; 
-let myChatId = "LOCAL_USER", targetChatId = null, lastReceivedData = null;
+let peer = null, dataConnection = null, lastReceivedData = null;
 
-// Инициализируем контекст Telegram WebApp
-let tg = null;
-if (window.Telegram && window.Telegram.WebApp) {
-    tg = window.Telegram.WebApp;
-    tg.ready();
-    tg.expand(); // Разворачиваем окно на весь экран телефона
-    
-    if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-        myChatId = tg.initDataUnsafe.user.id.toString();
-    }
-}
-
+// Стартовая конфигурация Pro-интерфейса автора
 toggleCamBtn.innerText = "Включить камеру";
 toggleCamBtn.style.borderColor = "#00ffcc";
-myIdDisplay.innerText = myChatId;
 netStatus.innerText = "СТАТУС: РЕЖИМ САМОДИАГНОСТИКИ (МАТЕМАТИЧЕСКИЙ ТЕСТ)";
 
 function resizeViewports() {
@@ -48,20 +36,24 @@ function resizeViewports() {
 window.addEventListener('resize', resizeViewports);
 resizeViewports();
 
+// --- УПРАВЛЕНИЕ РЕЖИМАМИ РАБОТЫ (ТУМБЛЕРЫ) ---
+
 modeLoopBtn.addEventListener('click', () => {
     signalMode = 'loop';
     modeLoopBtn.classList.add('active'); modeNetBtn.classList.remove('active');
     networkBlock.style.display = 'none';
     netStatus.innerText = isCamActive ? "СТАТУС: РЕЖИМ САМОДИАГНОСТИКИ (СЕНСОР)" : "СТАТУС: РЕЖИМ САМОДИАГНОСТИКИ (МАТЕМАТИЧЕСКИЙ ТЕСТ)";
     netStatus.style.color = "#00ffcc";
+    if (peer) { peer.destroy(); peer = null; }
 });
 
 modeNetBtn.addEventListener('click', () => {
     signalMode = 'network';
     modeNetBtn.classList.add('active'); modeLoopBtn.classList.remove('active');
     networkBlock.style.display = 'block';
-    netStatus.innerText = "СТАТУС: TELEGRAM WEBAPP СВЯЗЬ АКТИВНА"; 
+    netStatus.innerText = "СТАТУС: ИНИЦИАЛИЗАЦИЯ ВНЕШНЕГО СИГНАЛА...";
     netStatus.style.color = "#bd00ff";
+    initExternalNetwork(); 
 });
 
 toggleCamBtn.addEventListener('click', () => {
@@ -76,29 +68,63 @@ toggleCamBtn.addEventListener('click', () => {
     }
 });
 
-// Отправка вокселей через встроенную шину данных Telegram WebApp
-function sendSfiralDataViaTG(voxelsPack) {
-    if (!tg) return;
-    
-    const payload = {
-        type: "gideon_v-",
-        from: myChatId,
-        v: voxelsPack.map(pt => [Math.round(pt.x*100), Math.round(pt.y*100), Math.round(pt.z*100), pt.r, pt.g, pt.b])
-    };
+// --- СИСТЕМА НЕЗАВИСИМОГО ВНЕШНЕГО СИГНАЛА (WebRTC P2P) ---
 
-    // Передаем данные обратно в чат бота абсолютно легально и без блокировок CORS
-    tg.sendData(JSON.stringify(payload));
+function initExternalNetwork() {
+    if (peer) return;
+    
+    myIdDisplay.innerText = "СВЯЗЬ С СЕРВЕРОМ...";
+
+    // ИСПРАВЛЕНО: Используем стабильный публичный европейский сервер сигналинга (Metered), защищенный от блокировок
+    peer = new Peer(null, {
+        host: 'peerjs.com', 
+        port: 443,
+        secure: true,
+        path: '/',
+        debug: 1
+    });
+
+    peer.on('open', (id) => {
+        myIdDisplay.innerText = id; // Выводим сгенерированный сервером внешний ID
+        if (signalMode === 'network') {
+            netStatus.innerText = "СТАТУС: ВНЕШНИЙ АДРЕС УСПЕШНО ПОЛУЧЕН";
+            netStatus.style.color = "#00ffcc";
+        }
+    });
+
+    peer.on('connection', (conn) => {
+        dataConnection = conn;
+        setupConnectionHandlers();
+    });
+    
+    peer.on('error', (err) => {
+        netStatus.innerText = "СТАТУС: СБОЙ СЕРВЕРА СИГНАЛИЗАЦИИ, ПЕРЕПОДКЛЮЧЕНИЕ...";
+        netStatus.style.color = "#ff4444";
+    });
 }
 
 btnConnect.addEventListener('click', () => {
-    const inputVal = peerIdInput.value.trim();
-    if (!inputVal) return alert("Введите ID абонента");
-    targetChatId = inputVal; 
-    netStatus.innerText = `СТАТУС: ПЕРЕДАЧА ДАННЫХ В ЧАТ TELEGRAM`; 
-    netStatus.style.color = "#bd00ff";
+    const remoteId = peerIdInput.value.trim();
+    if (!remoteId || !peer) return;
+    netStatus.innerText = "СТАТУС: ПОИСК УДАЛЕННОГО УЗЛА СВЯЗИ...";
+    dataConnection = peer.connect(remoteId);
+    setupConnectionHandlers();
 });
 
-let frameThrottle = 0;
+function setupConnectionHandlers() {
+    dataConnection.on('open', () => {
+        netStatus.innerText = `СТАТУС: ВНЕШНЯЯ P2P СЕССИЯ АКТИВНА [УЗЕЛ: ${dataConnection.peer.substring(0,6)}]`;
+        netStatus.style.color = "#bd00ff";
+    });
+    dataConnection.on('data', (data) => {
+        if (signalMode === 'network' && data && data.type === 'sfiral_stream') {
+            lastReceivedData = data.voxels;
+        }
+    });
+}
+
+// --- ГЛАВНЫЙ ВЫЧИСЛИТЕЛЬНЫЙ КОНВЕЙЕР ---
+
 function runStreamingPipeline() {
     glLocal.clearRect(0, 0, localCanvas.width, localCanvas.height); glRemote.clearRect(0, 0, remoteCanvas.width, remoteCanvas.height);
     sTime += 0.006;
@@ -135,12 +161,8 @@ function runStreamingPipeline() {
 
     if (signalMode === 'loop') {
         lastReceivedData = outgoingVoxelsPack;
-    } else if (signalMode === 'network' && outgoingVoxelsPack.length > 0) {
-        frameThrottle++; 
-        if (frameThrottle >= 60) { // Отправляем пакет при фиксации кадра кнопкой
-            sendSfiralDataViaTG(outgoingVoxelsPack); 
-            frameThrottle = 0; 
-        }
+    } else if (signalMode === 'network' && dataConnection && dataConnection.open && outgoingVoxelsPack.length > 0) {
+        dataConnection.send({ type: 'sfiral_stream', voxels: outgoingVoxelsPack });
     }
 
     if (lastReceivedData && lastReceivedData.length > 0) {
